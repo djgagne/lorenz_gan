@@ -1,12 +1,15 @@
-from keras.layers import concatenate, RepeatVector, Input, Permute
+from keras.layers import concatenate, RepeatVector, Input, Permute, Flatten
 from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Dropout, Reshape
 from keras.optimizers import Adam
+import xarray as xr
 from keras.models import Model
 import numpy as np
+import pandas as pd
+from os.path import join
 
 
-def generator_conv(num_cond_inputs, num_random_inputs, num_outputs, 
-                   activation, min_conv_filters=8, min_data_width=4, filter_width=3):
+def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
+                   activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3):
     num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
     max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
     curr_conv_filters = max_conv_filters
@@ -25,16 +28,17 @@ def generator_conv(num_cond_inputs, num_random_inputs, num_outputs,
     return generator
 
 
-def discriminator_conv(num_cond_inputs, num_sample_inputs, activation, min_conv_filters=8, min_data_width=4,
-		       filter_width=3):		
+def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
+                       min_conv_filters=8, min_data_width=4,
+                       filter_width=3):
     disc_cond_input = Input(shape=(num_cond_inputs, ))
     disc_cond_input_repeat = RepeatVector(num_sample_inputs)(disc_cond_input)
-    disc_cond_input_repeat = Permute((2, 1))(disc_cond_input_repeat)
+    #disc_cond_input_repeat = Permute((2, 1))(disc_cond_input_repeat)
     disc_sample_input = Input(shape=(num_sample_inputs, 1))
-    disc_model = concatenate([disc_sample_input, disc_cond_input]) 
+    disc_model = concatenate([disc_sample_input, disc_cond_input_repeat])
     num_layers = int(np.log2(num_sample_inputs) - np.log2(min_data_width))
     max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
-    curr_conv_filters = max_conv_filters
+    curr_conv_filters = min_conv_filters
     for i in range(num_layers):
         disc_model = Conv1D(curr_conv_filters, filter_width, strides=2, padding="same")(disc_model)
         disc_model = Activation(activation)(disc_model)
@@ -46,7 +50,7 @@ def discriminator_conv(num_cond_inputs, num_sample_inputs, activation, min_conv_
     return discriminator
 
 
-def generator_dense(num_cond_inputs, num_random_inputs, num_hidden, num_outputs, activation): 
+def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_outputs=32, activation="selu"):
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
@@ -57,16 +61,17 @@ def generator_dense(num_cond_inputs, num_random_inputs, num_hidden, num_outputs,
     return generator
 
 
-def discriminator_dense(num_cond_inputs, num_sample_inputs, num_hidden, activation):
+def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, activation="selu"):
     disc_cond_input = Input(shape=(num_cond_inputs, ))
     disc_sample_input = Input(shape=(num_sample_inputs, ))
     disc_model = concatenate([disc_cond_input, disc_sample_input])
     disc_model = Dense(num_hidden)(disc_model)
     disc_model = Activation(activation)(disc_model)
     disc_model = Dense(1)(disc_model)
-    disc_model = Actvation("sigmoid")(disc_model)
+    disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
     return discriminator
+
 
 def stack_gen_disc(generator, discriminator):
     """
@@ -80,20 +85,127 @@ def stack_gen_disc(generator, discriminator):
         Generator layers attached to discriminator layers.
     """
     discriminator.trainable = False
-    model = discriminator(generator.output)
+    model = discriminator([generator.input[0], generator.output])
     model_obj = Model(generator.input, model)
     return model_obj
 
 
-def initialize_gan(generator, discriminator, optimizer):
+def initialize_gan(generator, discriminator, optimizer, metrics):
     generator.compile(optimizer=optimizer, loss="mse")
-    discriminator.compile(optimizer=optimizer, loss="binary_crossentropy")
+    discriminator.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=metrics)
     gen_disc = stack_gen_disc(generator, discriminator)
-    gen_disc.compile(optimizer=optimizer, loss="binary_crossentropy")
+    gen_disc.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=metrics)
     print(generator.summary())
     print(discriminator.summary())
     print(gen_disc.summary())
     return gen_disc
 
-def train_gan(data, generator, discriminator, batch_size, num_epochs):
+
+def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_disc,
+              batch_size, random_vec_size, gan_path, gan_index, num_epochs=(1, 5, 10), metrics=["accuracy"],
+              scaling_values=None, out_dtype="float32"):
+    batch_size = int(batch_size)
+    batch_half = int(batch_size // 2)
+    train_order = np.arange(train_sample_data.shape[0])
+    disc_loss_history = []
+    gen_loss_history = []
+    time_history = []
+    current_epoch = []
+    batch_labels = np.zeros(batch_size, dtype=int)
+    batch_labels[:batch_half] = 1
+    gen_labels = np.ones(batch_size, dtype=int)
+    batch_vec = np.zeros((batch_size, random_vec_size))
+    gen_batch_vec = np.zeros((batch_size, random_vec_size), dtype=train_sample_data.dtype)
+    combo_data_batch = np.zeros(np.concatenate([[batch_size], train_sample_data.shape[1:]]), dtype=out_dtype)
+    combo_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1]), dtype=out_dtype)
+    gen_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[10]), dtype=out_dtype)
+    hist_cols = ["Epoch", "Batch", "Disc Loss"] + ["Disc " + m for m in metrics] + \
+                ["Gen Loss"] + ["Gen " + m for m in metrics]
+    for epoch in range(1, max(num_epochs) + 1):
+        np.random.shuffle(train_order)
+        for b, b_index in enumerate(np.arange(batch_half, train_sample_data.shape[0] + batch_half, batch_half)):
+            batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
+            gen_batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
+            gen_cond_data_batch[:] = np.random.normal(size=(batch_size, train_cond_data.shape[1]))
+            combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_half: b_index]]
+            combo_cond_data_batch[:batch_half] = train_cond_data[train_order[b_index - batch_half: b_index]]
+            combo_cond_data_batch[batch_half:] = np.random.normal(size=(batch_half, train_cond_data.shape[1]))
+            combo_data_batch[batch_half:] = generator.predict_on_batch([combo_cond_data_batch[batch_half:],
+                                                                        batch_vec[batch_half:]])
+            disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch,
+                                                                   combo_data_batch],
+                                                                  batch_labels))
+            gen_loss_history.append(gen_disc.train_on_batch([gen_cond_data_batch, gen_batch_vec],
+                                                            gen_labels))
+        if epoch in num_epochs:
+            print("{2} Save Models Combo: {0} Epoch: {1}".format(gan_index,
+                                                                 epoch,
+                                                                 pd.Timestamp("now")))
+            generator.save(join(gan_path, "gan_generator_{0:04d}_epoch_{1:04d}.h5".format(gan_index, epoch)))
+            discriminator.save(join(gan_path, "gan_discriminator_{0:04d}_{1:04d}.h5".format(gan_index, epoch)))
+            gen_noise = np.random.normal(size=(batch_size, random_vec_size))
+            gen_cond_noise = np.random.normal(size=(batch_size, train_cond_data.shape[1]))
+            gen_data_epoch = unnormalize_data(generator.predict_on_batch([gen_cond_noise, gen_noise]), scaling_values)
+            gen_da = xr.DataArray(gen_data_epoch.astype(out_dtype), coords={"t": np.arange(gen_data_epoch.shape[0]),
+                                                                            "y": np.arange(gen_data_epoch.shape[1]),
+                                                                            "channel": np.array(0)},
+                                  dims=("t", "y", "channel"),
+                                  attrs={"long_name": "Synthetic data", "units": ""})
+            gen_da.to_dataset(name="gen_patch").to_netcdf(join(gan_path,
+                                                               "gan_gen_patches_{0:04d}_epoch_{1:04d}.nc".format(
+                                                                   gan_index, epoch)),
+                                                          encoding={"gen_patch": {"zlib": True,
+                                                                                  "complevel": 1}})
+            time_history_index = pd.DatetimeIndex(time_history)
+            history = pd.DataFrame(np.hstack([current_epoch, disc_loss_history,
+                                              gen_loss_history]),
+                                   index=time_history_index, columns=hist_cols)
+            history.to_csv(join(gan_path, "gan_loss_history_{0:04d}.csv".format(gan_index)), index_label="Time")
+    time_history_index = pd.DatetimeIndex(time_history)
+    history = pd.DataFrame(np.hstack([current_epoch, disc_loss_history,
+                                      gen_loss_history]),
+                           index=time_history_index, columns=hist_cols)
+    history.to_csv(join(gan_path, "gan_loss_history_{0:04d}.csv".format(gan_index)), index_label="Time")
     return
+
+
+def normalize_data(data, scaling_values=None):
+    """
+    Normalize each channel in the 4 dimensional data matrix independently.
+
+    Args:
+        data: 4-dimensional array with dimensions (example, y, x, channel/variable)
+        scaling_values: pandas dataframe containing mean and std columns
+
+    Returns:
+        normalized data array, scaling_values
+    """
+    normed_data = np.zeros(data.shape, dtype=data.dtype)
+    scale_cols = ["mean", "std"]
+    if scaling_values is None:
+        scaling_values = pd.DataFrame(np.zeros((data.shape[-1], len(scale_cols)), dtype=np.float32),
+                                      columns=scale_cols)
+    for i in range(data.shape[-1]):
+        scaling_values.loc[i, ["mean", "std"]] = [data[:, :, i].mean(), data[:, :, i].std()]
+        normed_data[:, :, i] = (data[:, :, :, i] - scaling_values.loc[i, "mean"]) / scaling_values.loc[i, "std"]
+    return normed_data, scaling_values
+
+
+def unnormalize_data(normed_data, scaling_values):
+    data = np.zeros(normed_data.shape, dtype=normed_data.dtype)
+    for i in range(normed_data.shape[-1]):
+        data[:, :, i] = normed_data[:, :, i] * scaling_values.loc[i, "std"] + scaling_values.loc[i, "mean"]
+    return data
+
+
+def main():
+    gen_model = generator_conv()
+    disc_model = discriminator_conv()
+    metrics = ["accuracy"]
+    opt = Adam(lr=0.0001, beta_1=0.5)
+    gen_disc = initialize_gan(gen_model, disc_model, opt, metrics)
+    return
+
+
+if __name__ == "__main__":
+    main()

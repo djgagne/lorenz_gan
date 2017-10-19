@@ -30,16 +30,16 @@ def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
     k4_dYdt = np.zeros(Y.shape)
     for n in range(1, num_steps + 1):
         print(n)
-        k1_dXdt[:], k1_dYdt[:] = l96_truth_step(X, Y, h, F, b, c)
+        k1_dXdt[:], k1_dYdt[:] = l96_truth_step(X, Y, h, F, b, c, n)
         k2_dXdt[:], k2_dYdt[:] = l96_truth_step(X + k1_dXdt * time_step / 2,
                                           Y + k1_dYdt * time_step / 2,
-                                          h, F, b, c)
+                                          h, F, b, c, n)
         k3_dXdt[:], k3_dYdt[:] = l96_truth_step(X + k2_dXdt * time_step / 2,
                                           Y + k2_dYdt * time_step / 2,
-                                          h, F, b, c)
+                                          h, F, b, c, n)
         k4_dXdt[:], k4_dYdt[:] = l96_truth_step(X + k3_dXdt * time_step,
                                           Y + k3_dYdt * time_step,
-                                          h, F, b, c)
+                                          h, F, b, c, n)
         X += (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
         Y += (k1_dYdt + 2 * k2_dYdt + 2 * k3_dYdt + k4_dYdt) / 6 * time_step
         X_out[n] = X
@@ -57,15 +57,16 @@ def main():
     X[0] = 1
     Y[0] = 1
     h = 1
-    F = 30
     b = 10
     c = 10
     time_step = 0.001
     num_steps = 100000
+    F = 30
     X_out, Y_out = run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps)
     print(X_out.max(), X_out.min())
     plt.figure(figsize=(5, 10))
-    plt.contourf(X_out, np.linspace(-F, F, 13), cmap="RdBu_r")
+    X_mag = np.round(np.max(np.abs(X_out)))
+    plt.contourf(X_out, np.linspace(-X_mag, X_mag, 25), cmap="RdBu_r")
     plt.colorbar()
     plt.show()
     return 
