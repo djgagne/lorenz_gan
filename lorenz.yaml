@@ -1,0 +1,31 @@
+lorenz:
+    K: 8
+    J: 32
+    h: 1
+    b: 10.0
+    c: 10.0
+    F: 30.0
+    time_step: 0.001
+    num_steps: 100000
+    burn_in: 2000
+gan:
+    structure: conv 
+    generator:
+        num_cond_inputs: 3
+        num_random_inputs: 10
+        num_outputs: 32
+        activation: selu
+        min_conv_filters: 8
+        min_data_width: 4
+        filter_width: 3
+    discriminator:
+        num_cond_inputs: 3
+        num_sample_inputs: 32
+        activation: selu
+        min_conv_filters: 8
+        min_data_width: 4
+        filter_width: 3
+    gan_path: ./
+    gan_index: 0
+    num_epochs: [1, 5, 10]
+    metrics: ["accuracy"]

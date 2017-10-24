@@ -10,6 +10,24 @@ from os.path import join
 
 def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
                    activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3):
+    """
+    Convolutional conditional generator neural network. The conditional generator takes a combined vector of
+    normalized conditional and random values and outputs normalized synthetic examples of the training data.
+    This function creates the network architecture. The network design assumes that the number of convolution
+    filters halves with each convolutional layer.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_random_inputs (int): Size of the random input vector.
+        num_outputs (int): Size of the output vector. Recommend using a power of 2 for easy scaling.
+        activation (str): Type of activation function for the convolutional layers. Recommend selu, elu, or relu.
+        min_conv_filters (int): Number of convolutional filters at the second to last convolutional layer
+        min_data_width (int): Width of the first convolutional layer after the dense layer. Should be a power
+            of 2.
+        filter_width (int): Width of the convolutional filters
+    Returns:
+        generator: Keras Model object of the generator network
+    """
     num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
     max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
     curr_conv_filters = max_conv_filters
@@ -17,6 +35,7 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
     gen_model = Dense(min_data_width * max_conv_filters)(gen_model)
+    gen_model = Activation(activation)(gen_model)
     gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
     for i in range(0, num_layers):
         curr_conv_filters //= 2
@@ -31,13 +50,28 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
 def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
                        min_conv_filters=8, min_data_width=4,
                        filter_width=3):
+    """
+    Convolutional conditional discriminator neural network architecture. The conditional discriminator takes the
+    conditional vector and a real or synthetic sample and predicts the probability that the sample is real or not.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_sample_inputs (int): Size of the sample input vector
+        activation (str): Activation Function for convolutional layers. Recommend selu, elu, or relu.
+        min_conv_filters (int): Number of convolution filters in the first convolution layer. Doubles with
+            each subsequent layer
+        min_data_width (int): Width of the convolutional data after the last convolutional layer. Assumes halving
+            from the initial vector
+        filter_width (int): Width of the convolutional feature maps
+
+    Returns:
+        Discrminator Keras Model object
+    """
     disc_cond_input = Input(shape=(num_cond_inputs, ))
     disc_cond_input_repeat = RepeatVector(num_sample_inputs)(disc_cond_input)
-    #disc_cond_input_repeat = Permute((2, 1))(disc_cond_input_repeat)
     disc_sample_input = Input(shape=(num_sample_inputs, 1))
     disc_model = concatenate([disc_sample_input, disc_cond_input_repeat])
     num_layers = int(np.log2(num_sample_inputs) - np.log2(min_data_width))
-    max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
     curr_conv_filters = min_conv_filters
     for i in range(num_layers):
         disc_model = Conv1D(curr_conv_filters, filter_width, strides=2, padding="same")(disc_model)
@@ -51,6 +85,19 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
 
 
 def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_outputs=32, activation="selu"):
+    """
+    Dense conditional generator network. Includes 1 hidden layer.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_random_inputs (int): Size of the random input vector.
+        num_hidden (int): Number of hidden neurons
+        num_outputs (int): Number of output neurons
+        activation (str): Activation function for the hidden layer.
+
+    Returns:
+        Generator Keras Model object.
+    """
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
@@ -62,6 +109,18 @@ def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_
 
 
 def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, activation="selu"):
+    """
+    Dense conditional discriminator network.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector
+        num_sample_inputs (int): Size of the sample input vector
+        num_hidden (int): Number of hidden neurons
+        activation (str): Type of activation function
+
+    Returns:
+        Discriminator model
+    """
     disc_cond_input = Input(shape=(num_cond_inputs, ))
     disc_sample_input = Input(shape=(num_sample_inputs, ))
     disc_model = concatenate([disc_cond_input, disc_sample_input])
@@ -75,11 +134,11 @@ def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, 
 
 def stack_gen_disc(generator, discriminator):
     """
-    Combines generator and discrminator layers together while freezing the weights of the discriminator layers
+    Combines generator and discrminator layers together while freezing the weights of the discriminator layers.
 
     Args:
-        generator:
-        discriminator:
+        generator (Keras Model object): Generator model
+        discriminator (Keras Model object): Discriminator model
 
     Returns:
         Generator layers attached to discriminator layers.
@@ -91,6 +150,18 @@ def stack_gen_disc(generator, discriminator):
 
 
 def initialize_gan(generator, discriminator, optimizer, metrics):
+    """
+    Compiles each of the GAN component models and stacks the generator and discrminator together
+
+    Args:
+        generator: Generator model object
+        discriminator: Discriminator model object
+        optimizer: Optimizer object or str referring to optimizer with default settings
+        metrics: List of additional scoring metrics, such as accuracy
+
+    Returns:
+        Stacked Generator-discriminator model
+    """
     generator.compile(optimizer=optimizer, loss="mse")
     discriminator.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=metrics)
     gen_disc = stack_gen_disc(generator, discriminator)
@@ -104,6 +175,27 @@ def initialize_gan(generator, discriminator, optimizer, metrics):
 def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_disc,
               batch_size, random_vec_size, gan_path, gan_index, num_epochs=(1, 5, 10), metrics=["accuracy"],
               scaling_values=None, out_dtype="float32"):
+    """
+    Trains the full GAN model on provided training data
+
+    Args:
+        train_sample_data: Training samples
+        train_cond_data: Training condition vectors paired with samples
+        generator: Generator object
+        discriminator: Discriminator object
+        gen_disc: Generator-discriminator stack object
+        batch_size: Number of training examples per batch
+        random_vec_size: Size of the random vector for the generator
+        gan_path: Path to saving GAN model objects
+        gan_index: GAN configuration index
+        num_epochs: List of epochs to output saved models
+        metrics: List of metrics for training
+        scaling_values: pandas dataframe of mean and standard deviation
+        out_dtype: Datatype of synthetic output
+
+    Returns:
+
+    """
     batch_size = int(batch_size)
     batch_half = int(batch_size // 2)
     train_order = np.arange(train_sample_data.shape[0])
@@ -121,8 +213,10 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
     gen_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[10]), dtype=out_dtype)
     hist_cols = ["Epoch", "Batch", "Disc Loss"] + ["Disc " + m for m in metrics] + \
                 ["Gen Loss"] + ["Gen " + m for m in metrics]
+    # Loop over each epoch
     for epoch in range(1, max(num_epochs) + 1):
         np.random.shuffle(train_order)
+        # Loop over all of the random training batches
         for b, b_index in enumerate(np.arange(batch_half, train_sample_data.shape[0] + batch_half, batch_half)):
             batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
             gen_batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
@@ -192,6 +286,16 @@ def normalize_data(data, scaling_values=None):
 
 
 def unnormalize_data(normed_data, scaling_values):
+    """
+    Re-scale normalized data back to original values
+
+    Args:
+        normed_data: normalized data
+        scaling_values: pandas dataframe of mean and standard deviation from normalize_data
+
+    Returns:
+        Re-scaled data
+    """
     data = np.zeros(normed_data.shape, dtype=normed_data.dtype)
     for i in range(normed_data.shape[-1]):
         data[:, :, i] = normed_data[:, :, i] * scaling_values.loc[i, "std"] + scaling_values.loc[i, "mean"]
