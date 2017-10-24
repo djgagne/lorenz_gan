@@ -6,26 +6,29 @@ lorenz:
     c: 10.0
     F: 30.0
     time_step: 0.001
-    num_steps: 100000
+    num_steps: 1000000
     burn_in: 2000
 gan:
-    structure: conv 
+    structure: conv
+    t_skip: 20
+    x_skip: 2
     generator:
         num_cond_inputs: 3
-        num_random_inputs: 10
+        num_random_inputs: 13
         num_outputs: 32
-        activation: selu
-        min_conv_filters: 8
+        activation: relu
+        min_conv_filters: 16
         min_data_width: 4
-        filter_width: 3
+        filter_width: 5
     discriminator:
         num_cond_inputs: 3
         num_sample_inputs: 32
-        activation: selu
-        min_conv_filters: 8
+        activation: relu
+        min_conv_filters: 16
         min_data_width: 4
-        filter_width: 3
+        filter_width: 5
     gan_path: ./
+    batch_size: 128
     gan_index: 0
     num_epochs: [1, 5, 10]
     metrics: ["accuracy"]
