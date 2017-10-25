@@ -1,6 +1,6 @@
-from lorenz_gan.lorenz import run_lorenz96_truth
-from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense, stack_gen_disc
-from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, unnormalize_data
+from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
+from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
+from lorenz_gan.gan import train_gan, initialize_gan, normalize_data
 from keras.optimizers import Adam
 import numpy as np
 import yaml
@@ -18,11 +18,15 @@ def main():
         config = yaml.load(config_obj)
     if not exists(config["gan"]["gan_path"]):
         mkdir(config["gan"]["gan_path"])
-    X_out, Y_out = generate_lorenz_data(config["lorenz"])
-    X_series, Y_series = process_lorenz_data(config, X_out, Y_out)
-    print(X_series.shape)
-    print(Y_series.shape)
-    train_lorenz_gan(config, X_series, Y_series)
+    X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
+    combined_data = process_lorenz_data(X_out, Y_out, times, steps,
+                                        config["gan"]["generator"]["num_cond_inputs"],
+                                        config["lorenz"]["J"], config["gan"]["x_skip"],
+                                        config["gan"]["t_skip"])
+    save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
+    combined_data.to_csv(config["output_csv_file"], index=False)
+    print(combined_data)
+    train_lorenz_gan(config, combined_data)
     return
 
 
@@ -31,28 +35,17 @@ def generate_lorenz_data(config):
     Y = np.zeros(config["J"] * config["K"], dtype=np.float32)
     X[0] = 1
     Y[0] = 1
-    X_out, Y_out = run_lorenz96_truth(X, Y, config["h"], config["F"], config["b"],
-                                      config["c"], config["time_step"], config["num_steps"])
-    return X_out[config['burn_in']:], Y_out[config["burn_in"]:]
+    skip = config["skip"]
+    X_out, Y_out, times, steps = run_lorenz96_truth(X, Y, config["h"], config["F"], config["b"],
+                                                    config["c"], config["time_step"], config["num_steps"])
+    return (X_out[config['burn_in']::skip], Y_out[config["burn_in"]::skip],
+            times[config["burn_in"]::skip], steps[config["burn_in"]::skip])
 
 
-def process_lorenz_data(config, X_out, Y_out):
-    cond_i = config["gan"]["generator"]["num_cond_inputs"]
-    J = config["lorenz"]["J"]
-    X_series_list = []
-    Y_series_list = []
-    x_skip = config["gan"]["x_skip"]
-    t_skip = config["gan"]["t_skip"]
-    for k in range(0, X_out.shape[1], x_skip):
-        X_series_list.append(np.stack([X_out[i:i-cond_i:-1, k]
-                             for i in range(cond_i, X_out.shape[0], t_skip)], axis=0))
-        Y_series_list.append(Y_out[cond_i::t_skip, k * J: (k+1) * J])
-    X_series = np.expand_dims(np.vstack(X_series_list), axis=-1)
-    Y_series = np.expand_dims(np.vstack(Y_series_list), axis=-1)
-    return X_series, Y_series
-
-
-def train_lorenz_gan(config, X_series, Y_series):
+def train_lorenz_gan(config, combined_data):
+    X_series = np.expand_dims(combined_data[["X_t", "X_t-1", "X_t-2"]].values, axis=-1)
+    Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
+                              axis=-1)
     X_norm, X_scaling_values = normalize_data(X_series)
     Y_norm, Y_scaling_values = normalize_data(Y_series)
     trim = X_norm.shape[0] % config["gan"]["batch_size"]
@@ -68,7 +61,6 @@ def train_lorenz_gan(config, X_series, Y_series):
               config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"],
               Y_scaling_values, X_scaling_values)
-
 
 
 if __name__ == "__main__":

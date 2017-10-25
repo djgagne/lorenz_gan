@@ -7,11 +7,12 @@ lorenz:
     F: 30.0
     time_step: 0.001
     num_steps: 1000000
+    skip: 5
     burn_in: 2000
 gan:
     structure: conv
-    t_skip: 20
-    x_skip: 2
+    t_skip: 10
+    x_skip: 1
     generator:
         num_cond_inputs: 3
         num_random_inputs: 13
@@ -27,8 +28,10 @@ gan:
         min_conv_filters: 16
         min_data_width: 4
         filter_width: 5
-    gan_path: ./
+    gan_path: ./exp
     batch_size: 128
     gan_index: 0
     num_epochs: [1, 5, 10]
     metrics: ["accuracy"]
+output_nc_file: ./exp/lorenz_output.nc
+output_csv_file: ./exp/lorenz_combined_output.csv
