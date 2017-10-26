@@ -2,6 +2,7 @@ from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormali
 from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape
 from keras.optimizers import Adam
 import xarray as xr
+from scipy.stats import expon
 from keras.models import Model
 import numpy as np
 import pandas as pd
@@ -173,11 +174,51 @@ def initialize_gan(generator, discriminator, optimizer, metrics):
     return gen_disc
 
 
-def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_disc,
-              batch_size, random_vec_size, gan_path, gan_index, num_epochs=(1, 5, 10), metrics=["accuracy"],
-              sample_scaling_values=None, cond_scaling_values=None, out_dtype="float32"):
+def fit_condition_distributions(train_cond_data):
     """
-    Trains the full GAN model on provided training data
+    Calculate the scale parameter for the exponential distribution of correlated conditional variables
+    for the Lorenz 96 model in time.
+
+    Args:
+        train_cond_data: array of conditioning values where the first column is the current X, and each
+            other column is a lagged X value
+
+    Returns:
+        array of scale values
+    """
+    train_cond_exp_scale = np.zeros(train_cond_data.shape[1] - 1)
+    for i in range(1, train_cond_data.shape[1]):
+        train_cond_exp_scale[i - 1] = expon.fit(np.abs(train_cond_data[:, 0] - train_cond_data[:, i]), floc=0)[1]
+    return train_cond_exp_scale
+
+
+def generate_random_condition_data(batch_size, num_cond_inputs, train_cond_scale):
+    """
+    Generate correlated conditional random numbers to train the generator network.
+
+    Args:
+        batch_size: number of random samples
+        num_cond_inputs: number of conditional inputs
+        train_cond_scale: exponential distribution scale values
+
+    Returns:
+
+    """
+    batch_cond_data = np.zeros((batch_size, num_cond_inputs, 1))
+    batch_cond_data[:, 0, 0] = np.random.normal(size=batch_size)
+    for t in range(1, train_cond_scale.size + 1):
+        batch_cond_data[:, t , 0] = batch_cond_data[:, 0, 0] + \
+                                    np.random.choice([-1, 1], size=batch_size) * expon.rvs(loc=0,
+                                                                                           scale=train_cond_scale[t-1],
+                                                                                           size=batch_size)
+    return batch_cond_data
+
+
+def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_disc,
+              batch_size, random_vec_size, gan_path, gan_index, num_epochs=(1, 5, 10), metrics=("accuracy",),
+              sample_scaling_values=None, cond_scaling_values=None, out_dtype="float32", epoch_sample_size=1000):
+    """
+    Trains the full GAN model on provided training data.
 
     Args:
         train_sample_data: Training samples
@@ -191,7 +232,8 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
         gan_index: GAN configuration index
         num_epochs: List of epochs to output saved models
         metrics: List of metrics for training
-        scaling_values: pandas dataframe of mean and standard deviation
+        sample_scaling_values: pandas dataframe of mean and standard deviation for training data
+        cond_scaling_values: pandas dataframe of mean and standard deviation for conditional data
         out_dtype: Datatype of synthetic output
 
     Returns:
@@ -211,6 +253,7 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
     gen_batch_vec = np.zeros((batch_size, random_vec_size), dtype=train_sample_data.dtype)
     combo_data_batch = np.zeros(np.concatenate([[batch_size], train_sample_data.shape[1:]]), dtype=out_dtype)
     combo_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1], 1), dtype=out_dtype)
+    train_cond_exp_scale = fit_condition_distributions(train_cond_data)
     gen_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1], 1), dtype=out_dtype)
     hist_cols = ["Epoch", "Batch", "Disc Loss"] + ["Disc " + m for m in metrics] + \
                 ["Gen Loss"] + ["Gen " + m for m in metrics]
@@ -221,10 +264,12 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
         for b, b_index in enumerate(np.arange(batch_half, train_sample_data.shape[0] + batch_half, batch_half)):
             batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
             gen_batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
-            gen_cond_data_batch[:] = np.random.normal(size=(batch_size, train_cond_data.shape[1], 1))
+            gen_cond_data_batch[:] = generate_random_condition_data(batch_size, train_cond_data.shape[1],
+                                                                    train_cond_exp_scale)
             combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_half: b_index]]
             combo_cond_data_batch[:batch_half] = train_cond_data[train_order[b_index - batch_half: b_index]]
-            combo_cond_data_batch[batch_half:] = train_cond_data[train_order[b_index - batch_half: b_index]]
+            combo_cond_data_batch[batch_half:] = generate_random_condition_data(batch_half, train_cond_data.shape[1],
+                                                                                train_cond_exp_scale)
             combo_data_batch[batch_half:] = generator.predict_on_batch([combo_cond_data_batch[batch_half:, :, 0],
                                                                         batch_vec[batch_half:]])
             disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch[:, :, 0],
@@ -244,21 +289,30 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
                                                                  pd.Timestamp("now")))
             generator.save(join(gan_path, "gan_generator_{0:04d}_epoch_{1:04d}.h5".format(gan_index, epoch)))
             discriminator.save(join(gan_path, "gan_discriminator_{0:04d}_{1:04d}.h5".format(gan_index, epoch)))
-            gen_noise = np.random.normal(size=(batch_size, random_vec_size))
-            gen_cond_noise = np.random.normal(size=(batch_size, train_cond_data.shape[1], 1))
-            gen_data_epoch = unnormalize_data(generator.predict_on_batch([gen_cond_noise[:, :, 0], gen_noise]),
+            gen_noise = np.random.normal(size=(epoch_sample_size, random_vec_size))
+            gen_cond_noise = generate_random_condition_data(epoch_sample_size, train_cond_data.shape[1],
+                                                            train_cond_exp_scale)
+            gen_data_epoch = unnormalize_data(generator.predict([gen_cond_noise[:, :, 0], gen_noise]),
                                               sample_scaling_values)
             cond_data_epoch = unnormalize_data(gen_cond_noise, cond_scaling_values)
-            gen_da = xr.DataArray(gen_data_epoch.astype(out_dtype), coords={"t": np.arange(gen_data_epoch.shape[0]),
-                                                                            "y": np.arange(gen_data_epoch.shape[1]),
-                                                                            "channel": np.array([0])},
-                                  dims=("t", "y", "channel"),
-                                  attrs={"long_name": "Synthetic data", "units": ""})
-            gen_da.to_dataset(name="gen_patch").to_netcdf(join(gan_path,
-                                                               "gan_gen_patches_{0:04d}_epoch_{1:04d}.nc".format(
-                                                                   gan_index, epoch)),
-                                                          encoding={"gen_patch": {"zlib": True,
-                                                                                  "complevel": 1}})
+            gen_da = {}
+            gen_da["gen_samples"] = xr.DataArray(gen_data_epoch.astype(out_dtype),
+                                               coords={"t": np.arange(gen_data_epoch.shape[0]),
+                                                       "y": np.arange(gen_data_epoch.shape[1]),
+                                                        "channel": np.array([0])},
+                                               dims=("t", "y", "channel"),
+                                               attrs={"long_name": "Synthetic data", "units": ""})
+            gen_da["gen_cond"] = xr.DataArray(cond_data_epoch.astype(out_dtype),
+                                              coords={"t": np.arange(cond_data_epoch.shape[0]),
+                                                      "c": np.arange(cond_data_epoch.shape[1]),
+                                                      "channel": np.array([0])},
+                                              dims=("t", "c", "channel"))
+            xr.Dataset(gen_da).to_netcdf(join(gan_path,
+                                              "gan_gen_patches_{0:04d}_epoch_{1:04d}.nc".format(gan_index, epoch)),
+                                         encoding={"gen_samples": {"zlib": True,
+                                                                   "complevel": 1},
+                                                   "gen_cond": {"zlib": True,
+                                                                "complevel": 1}})
             time_history_index = pd.DatetimeIndex(time_history)
             history = pd.DataFrame(np.hstack([current_epoch, disc_loss_history,
                                               gen_loss_history]),

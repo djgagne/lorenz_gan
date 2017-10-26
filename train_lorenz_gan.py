@@ -5,7 +5,7 @@ from keras.optimizers import Adam
 import numpy as np
 import yaml
 import argparse
-from os.path import exists
+from os.path import exists, join
 from os import mkdir
 
 
@@ -48,6 +48,12 @@ def train_lorenz_gan(config, combined_data):
                               axis=-1)
     X_norm, X_scaling_values = normalize_data(X_series)
     Y_norm, Y_scaling_values = normalize_data(Y_series)
+    X_scaling_values.to_csv(join(config["gan"]["gan_path"],
+                                 "gan_X_scaling_values_{0:04d}.csv".format(config["gan"]["gan_index"])),
+                            index_label="Channel")
+    Y_scaling_values.to_csv(join(config["gan"]["gan_path"],
+                                 "gan_Y_scaling_values_{0:04d}.csv".format(config["gan"]["gan_index"])),
+                            index_label="Channel")
     trim = X_norm.shape[0] % config["gan"]["batch_size"]
     if config["gan"]["structure"] == "dense":
         gen_model = generator_dense(**config["gan"]["generator"])
