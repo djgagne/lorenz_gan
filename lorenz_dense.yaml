@@ -10,29 +10,25 @@ lorenz:
     skip: 5
     burn_in: 2000
 gan:
-    structure: conv
+    structure: dense
     t_skip: 10
     x_skip: 1
     generator:
         num_cond_inputs: 3
         num_random_inputs: 13
         num_outputs: 32
-        activation: relu
-        min_conv_filters: 32
-        min_data_width: 4
-        filter_width: 4
+        num_hidden: 22
+        activation: selu
     discriminator:
         num_cond_inputs: 3
         num_sample_inputs: 32
-        activation: relu
-        min_conv_filters: 32
-        min_data_width: 4
-        filter_width: 4
+        num_hidden: 22
+        activation: selu
     gan_path: ./exp
-    batch_size: 64
+    batch_size: 128
     gan_index: 0
-    loss: binary_crossentropy
     num_epochs: [1, 5, 10]
+    loss: "mse"
     metrics: ["accuracy"]
 output_nc_file: ./exp/lorenz_output.nc
 output_csv_file: ./exp/lorenz_combined_output.csv

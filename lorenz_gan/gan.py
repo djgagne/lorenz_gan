@@ -106,6 +106,7 @@ def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_
     gen_model = Dense(num_hidden)(gen_model)
     gen_model = Activation(activation)(gen_model)
     gen_model = Dense(num_outputs)(gen_model)
+    gen_model = Reshape((num_outputs, 1))(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
@@ -124,8 +125,9 @@ def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, 
         Discriminator model
     """
     disc_cond_input = Input(shape=(num_cond_inputs, ))
-    disc_sample_input = Input(shape=(num_sample_inputs, ))
-    disc_model = concatenate([disc_cond_input, disc_sample_input])
+    disc_sample_input = Input(shape=(num_sample_inputs, 1))
+    disc_sample_flat = Flatten()(disc_sample_input)
+    disc_model = concatenate([disc_cond_input, disc_sample_flat])
     disc_model = Dense(num_hidden)(disc_model)
     disc_model = Activation(activation)(disc_model)
     disc_model = Dense(1)(disc_model)
@@ -151,7 +153,7 @@ def stack_gen_disc(generator, discriminator):
     return model_obj
 
 
-def initialize_gan(generator, discriminator, optimizer, metrics):
+def initialize_gan(generator, discriminator, loss, optimizer, metrics):
     """
     Compiles each of the GAN component models and stacks the generator and discrminator together
 
@@ -164,10 +166,10 @@ def initialize_gan(generator, discriminator, optimizer, metrics):
     Returns:
         Stacked Generator-discriminator model
     """
-    generator.compile(optimizer=optimizer, loss="mse")
-    discriminator.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=metrics)
+    generator.compile(optimizer=optimizer, loss=loss)
+    discriminator.compile(optimizer=optimizer, loss=loss, metrics=metrics)
     gen_disc = stack_gen_disc(generator, discriminator)
-    gen_disc.compile(optimizer=optimizer, loss="binary_crossentropy", metrics=metrics)
+    gen_disc.compile(optimizer=optimizer, loss=loss, metrics=metrics)
     print(generator.summary())
     print(discriminator.summary())
     print(gen_disc.summary())
