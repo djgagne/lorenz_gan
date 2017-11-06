@@ -13,6 +13,7 @@ gan:
     structure: conv
     t_skip: 10
     x_skip: 1
+    output: sample
     generator:
         num_cond_inputs: 3
         num_random_inputs: 13

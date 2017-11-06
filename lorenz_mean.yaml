@@ -11,25 +11,25 @@ lorenz:
     burn_in: 2000
 gan:
     structure: dense
+    output: dist
     t_skip: 10
     x_skip: 1
-    output: sample
     generator:
         num_cond_inputs: 3
-        num_random_inputs: 13
-        num_outputs: 32
-        num_hidden: 22
-        activation: selu
+        num_random_inputs: 2
+        num_outputs: 1
+        num_hidden: 3
+        activation: tanh
     discriminator:
         num_cond_inputs: 3
-        num_sample_inputs: 32
-        num_hidden: 22
-        activation: selu
-    gan_path: ./exp
+        num_sample_inputs: 1
+        num_hidden: 3
+        activation: tanh
+    gan_path: ./exp_mean
     batch_size: 128
     gan_index: 0
     num_epochs: [1, 5, 10]
-    loss: "mse"
+    loss: "binary_crossentropy"
     metrics: ["accuracy"]
-output_nc_file: ./exp/lorenz_output.nc
-output_csv_file: ./exp/lorenz_combined_output.csv
+output_nc_file: ./exp_mean/lorenz_output.nc
+output_csv_file: ./exp_mean/lorenz_combined_output.csv

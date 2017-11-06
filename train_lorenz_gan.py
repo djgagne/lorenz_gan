@@ -3,6 +3,7 @@ from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, 
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data
 from keras.optimizers import Adam
 import numpy as np
+import pandas as pd
 import yaml
 import argparse
 from os.path import exists, join
@@ -12,20 +13,25 @@ from os import mkdir
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", default="lorenz.yaml", help="Config yaml file")
+    parser.add_argument("-r", "--reload", action="store_true", default=False, help="Reload netCDF and csv files")
     args = parser.parse_args()
     config_file = args.config
     with open(config_file) as config_obj:
         config = yaml.load(config_obj)
     if not exists(config["gan"]["gan_path"]):
         mkdir(config["gan"]["gan_path"])
-    X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
-    combined_data = process_lorenz_data(X_out, Y_out, times, steps,
-                                        config["gan"]["generator"]["num_cond_inputs"],
-                                        config["lorenz"]["J"], config["gan"]["x_skip"],
-                                        config["gan"]["t_skip"])
-    save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
-    combined_data.to_csv(config["output_csv_file"], index=False)
-    print(combined_data)
+    if args.reload:
+        print("Reloading csv data")
+        combined_data = pd.read_csv(config["output_csv_file"])
+    else:
+        X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
+        combined_data = process_lorenz_data(X_out, Y_out, times, steps,
+                                            config["gan"]["generator"]["num_cond_inputs"],
+                                            config["lorenz"]["J"], config["gan"]["x_skip"],
+                                            config["gan"]["t_skip"])
+        save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
+        combined_data.to_csv(config["output_csv_file"], index=False)
+        print(combined_data)
     train_lorenz_gan(config, combined_data)
     return
 
@@ -47,7 +53,10 @@ def train_lorenz_gan(config, combined_data):
     Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
                               axis=-1)
     X_norm, X_scaling_values = normalize_data(X_series)
-    Y_norm, Y_scaling_values = normalize_data(Y_series)
+    if config["gan"]["output"].lower() == "mean":
+        Y_norm, Y_scaling_values = normalize_data(np.expand_dims(Y_series.mean(axis=1), axis=-1))
+    else:
+        Y_norm, Y_scaling_values = normalize_data(Y_series)
     X_scaling_values.to_csv(join(config["gan"]["gan_path"],
                                  "gan_X_scaling_values_{0:04d}.csv".format(config["gan"]["gan_index"])),
                             index_label="Channel")

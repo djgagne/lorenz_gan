@@ -333,7 +333,7 @@ def normalize_data(data, scaling_values=None):
     Normalize each channel in the 4 dimensional data matrix independently.
 
     Args:
-        data: 4-dimensional array with dimensions (example, y, x, channel/variable)
+        data: 4-dimensional array with dimensions (example, y, channel/variable)
         scaling_values: pandas dataframe containing mean and std columns
 
     Returns:
