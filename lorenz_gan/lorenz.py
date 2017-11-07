@@ -93,7 +93,8 @@ def l96_forecast_step(X, F):
     return dXdt
 
 
-def run_lorenz96_forecast(X, F, u_model, time_step, num_steps, random_seed):
+def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, time_step=0.005,
+                          x_time=3, random_seed=55):
     np.random.seed(random_seed)
     X_out = np.zeros((num_steps + 1, X.size))
     steps = np.arange(num_steps + 1)
@@ -107,6 +108,7 @@ def run_lorenz96_forecast(X, F, u_model, time_step, num_steps, random_seed):
         X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
         X_out[n] = X
     return X_out, times, steps
+
 
 def process_lorenz_data(X_out, Y_out, times, steps, cond_inputs, J, x_skip, t_skip):
     """

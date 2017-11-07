@@ -11,6 +11,54 @@ from os import mkdir
 
 
 def main():
+    """
+    This script runs the Lorenz '96 model and then trains a generative adversarial network
+    to parameterize the unresolved Y values. The script requires a config file as input.
+    The config file is formatted in the yaml format with the following information included.
+
+    lorenz: # The Lorenz model subsection
+        K: 8 # number of X variables
+        J: 32 # number of Y variables per X variable
+        h: 1 # coupling constant
+        b: 10 # spatial-scale ratio
+        c: 10 # time scale ratio
+        F: 30 # forcing term
+        time_step: 0.001 # time step of Lorenz truth model in MTU
+        num_steps: 1000000 # number of integration time steps
+        skip: 5 # number of steps to skip when saving out the model
+        burn_in: 2000 # number of steps to remove from the beginning of the integration
+    gan: # The GAN subsection
+        structure: conv # type of GAN neural network, options are conv or dense
+        t_skip: 10 # number of time steps to skip when saving data for training
+        x_skip: 1 # number of X variables to skip
+        output: sample # Train the neural network to output a "sample" of Ys or the "mean" of the Ys
+        generator:
+            num_cond_inputs: 3 # number of conditional X values
+            num_random_inputs: 13 # number of random values
+            num_outputs: 32 # number of output variables (should match J)
+            activation: relu # activation function
+            min_conv_filters: 32 # number of convolution filters in the last layer of the generator
+            min_data_width: 4 # width of the data array after the dense layer in the generator
+            filter_width: 4 # Size of the convolution filters
+        discriminator:
+            num_cond_inputs: 3 # number of conditional X values
+            num_sample_inputs: 32 # number of Y values
+            activation: relu # Activation function
+            min_conv_filters: 32 # number of convolution filters in the first layer of the discriminator
+            min_data_width: 4 # width of the data array before the dense layer in the discriminator
+            filter_width: 4 # width of the convolution filters
+        gan_path: ./exp # path where GAN files are saved
+        batch_size: 64 # Number of examples per training batch
+        gan_index: 0 # GAN configuration number
+        loss: binary_crossentropy # Loss function for the GAN
+        num_epochs: [1, 5, 10] # Epochs after which the GAN model is saved
+        metrics: ["accuracy"] # Metrics to calculate along with the loss
+    output_nc_file: ./exp/lorenz_output.nc # Where Lorenz 96 data is output
+    output_csv_file: ./exp/lorenz_combined_output.csv # Where flat file formatted data is saved
+
+    Returns:
+
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("config", default="lorenz.yaml", help="Config yaml file")
     parser.add_argument("-r", "--reload", action="store_true", default=False, help="Reload netCDF and csv files")
@@ -37,6 +85,15 @@ def main():
 
 
 def generate_lorenz_data(config):
+    """
+    Run the Lorenz '96 truth model
+
+    Args:
+        config:
+
+    Returns:
+
+    """
     X = np.zeros(config["K"], dtype=np.float32)
     Y = np.zeros(config["J"] * config["K"], dtype=np.float32)
     X[0] = 1
@@ -49,7 +106,24 @@ def generate_lorenz_data(config):
 
 
 def train_lorenz_gan(config, combined_data):
-    X_series = np.expand_dims(combined_data[["X_t", "X_t-1", "X_t-2"]].values, axis=-1)
+    """
+    Train GAN on Lorenz data
+
+    Args:
+        config:
+        combined_data:
+
+    Returns:
+
+    """
+    x_time_lags = np.arange(config["gan"]["generator"]["num_cond_inputs"])
+    x_cols = []
+    for t in x_time_lags:
+        if t == 0:
+            x_cols.append("X_t")
+        else:
+            x_cols.append("X_t-{0:d}".format(t))
+    X_series = np.expand_dims(combined_data[x_cols].values, axis=-1)
     Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
                               axis=-1)
     X_norm, X_scaling_values = normalize_data(X_series)
