@@ -102,8 +102,8 @@ def run_lorenz96_forecast(X, F, u_model, time_step, num_steps, random_seed):
     k1_dXdt = np.zeros(X.shape)
     k2_dXdt = np.zeros(X.shape)
     for n in range(1, num_steps + 1):
-        k1_dXdt[:] = l96_forecast_step(X, F)
-        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F)
+        k1_dXdt[:] = l96_forecast_step(X, F) - u_model.predict(X)
+        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - u_model.predict(X + k1_dXdt * time_step)
         X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
         X_out[n] = X
     return X_out, times, steps
