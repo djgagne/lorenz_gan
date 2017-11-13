@@ -16,21 +16,21 @@ gan:
     output: sample
     generator:
         num_cond_inputs: 3
-        num_random_inputs: 13
+        num_random_inputs: 20
         num_outputs: 32
-        activation: relu
-        min_conv_filters: 32
-        min_data_width: 4
-        filter_width: 4
+        activation: elu
+        min_conv_filters: 16
+        min_data_width: 2
+        filter_width: 5
     discriminator:
         num_cond_inputs: 3
         num_sample_inputs: 32
         activation: relu
-        min_conv_filters: 32
-        min_data_width: 4
-        filter_width: 4
+        min_conv_filters: 16
+        min_data_width: 2
+        filter_width: 5
     gan_path: ./exp
-    batch_size: 64
+    batch_size: 128
     gan_index: 0
     loss: binary_crossentropy
     num_epochs: [1, 5, 10]

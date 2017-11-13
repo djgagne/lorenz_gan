@@ -3,6 +3,7 @@ import pandas as pd
 import yaml
 import argparse
 from lorenz_gan.lorenz import run_lorenz96_forecast
+from lorenz_gan.submodels import SubModelGAN, AR1RandomUpdater, SubModelHist
 
 
 def main():
