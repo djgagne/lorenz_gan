@@ -1,8 +1,11 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data
+from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist
+import xarray as xr
 from keras.optimizers import Adam
 import numpy as np
+import pickle
 import pandas as pd
 import yaml
 import argparse
@@ -71,6 +74,9 @@ def main():
     if args.reload:
         print("Reloading csv data")
         combined_data = pd.read_csv(config["output_csv_file"])
+        lorenz_output = xr.open_dataset(config["output_nc_file"])
+        X_out = lorenz_output["lorenz_x"].values
+        Y_out = lorenz_output["lorenz_y"].values
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
         combined_data = process_lorenz_data(X_out, Y_out, times, steps,
@@ -80,6 +86,9 @@ def main():
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
         print(combined_data)
+    y_cols = combined_data.columns[combined_data.columns.str.contains("Y")]
+    train_random_updater(Y_out[:, 5], config["random_updater"]["out_file"])
+    train_histogram(combined_data["X_t"].values, combined_data[y_cols].sum(axis=1).values, **config["histogram"])
     train_lorenz_gan(config, combined_data)
     return
 
@@ -95,6 +104,7 @@ def generate_lorenz_data(config):
 
     """
     X = np.zeros(config["K"], dtype=np.float32)
+    # initialize Y array
     Y = np.zeros(config["J"] * config["K"], dtype=np.float32)
     X[0] = 1
     Y[0] = 1
@@ -154,6 +164,19 @@ def train_lorenz_gan(config, combined_data):
               config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"],
               Y_scaling_values, X_scaling_values)
+
+def train_random_updater(data, out_file):
+    random_updater = AR1RandomUpdater()
+    random_updater.fit(data)
+    with open(out_file, "wb") as out_file_obj:
+        pickle.dump(random_updater, out_file_obj, pickle.HIGHEST_PROTOCOL)
+
+
+def train_histogram(x_data, u_data, num_x_bins=10, num_u_bins=10, out_file="./histogram.pkl"):
+    hist_model = SubModelHist(num_x_bins, num_u_bins)
+    hist_model.fit(x_data, u_data)
+    with open(out_file, "wb") as out_file_obj:
+        pickle.dump(hist_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
 
 
 if __name__ == "__main__":

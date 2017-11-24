@@ -1,5 +1,6 @@
 from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization
-from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape
+from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer
+import keras.backend as K
 from keras.optimizers import Adam
 import xarray as xr
 from scipy.stats import expon
@@ -7,6 +8,33 @@ from keras.models import Model
 import numpy as np
 import pandas as pd
 from os.path import join
+from keras.regularizers import l2
+
+
+class Interpolate1D(Layer):
+    def __init__(self, **kwargs):
+        self.size = int(2)
+        super(Interpolate1D, self).__init__(**kwargs)
+
+    def compute_output_shape(self, input_shape):
+        size = self.size * input_shape[1] if input_shape[1] is not None else None
+        return input_shape[0], size, input_shape[2]
+
+    def call(self, inputs, **kwargs):
+        in_shape = K.int_shape(inputs)
+        combined_values = []
+        total_size = in_shape[1] * self.size
+        j = 0
+        for i in range(total_size):
+            if i == total_size - 1:
+                combined_values.append(2 * inputs[:, j-1: j, :] - combined_values[-1])
+            elif i % 2 == 0:
+                combined_values.append(inputs[:, j: j + 1, :])
+                j += 1
+            else:
+                combined_values.append(0.5 * inputs[:, j:j + 1, :] - 0.5 * inputs[:, j - 1: j, :])
+        output = K.concatenate(combined_values, axis=1)
+        return output
 
 
 def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
@@ -33,18 +61,33 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
     curr_conv_filters = max_conv_filters
     gen_cond_input = Input(shape=(num_cond_inputs, ))
+    gen_cond_repeat = RepeatVector(min_data_width)(gen_cond_input)
     gen_rand_input = Input(shape=(num_random_inputs, ))
-    gen_model = concatenate([gen_cond_input, gen_rand_input])
-    gen_model = Dense(min_data_width * max_conv_filters)(gen_model)
-    gen_model = Activation(activation)(gen_model)
+    #gen_model = concatenate([gen_cond_input, gen_rand_input])
+    gen_model = Dense(min_data_width * max_conv_filters)(gen_rand_input)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
     gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
+    gen_model = concatenate([gen_model, gen_cond_repeat])
+    #gen_model = BatchNormalization()(gen_model)
     for i in range(0, num_layers):
         curr_conv_filters //= 2
-        gen_model = Conv1D(curr_conv_filters, filter_width, padding="same")(gen_model)
+        gen_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+        if activation == "leaky":
+            gen_model = LeakyReLU(0.2)(gen_model)
+        else:
+            gen_model = Activation(activation)(gen_model)
+        gen_model = Interpolate1D()(gen_model)
+        #gen_model = BatchNormalization()(gen_model)
+    gen_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
         gen_model = Activation(activation)(gen_model)
-        gen_model = UpSampling1D(size=2)(gen_model)
-        gen_model = BatchNormalization()(gen_model)
-    gen_model = Conv1D(1, filter_width, padding="same")(gen_model)
+    gen_model = Conv1D(1, 3, padding="same", kernel_regularizer=l2())(gen_model)
+    gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
@@ -76,11 +119,15 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
     num_layers = int(np.log2(num_sample_inputs) - np.log2(min_data_width))
     curr_conv_filters = min_conv_filters
     for i in range(num_layers):
-        disc_model = Conv1D(curr_conv_filters, filter_width, strides=2, padding="same")(disc_model)
-        disc_model = Activation(activation)(disc_model)
+        disc_model = Conv1D(curr_conv_filters, filter_width,
+                            strides=2, padding="same", kernel_regularizer=l2())(disc_model)
+        if activation == "leaky":
+            disc_model = LeakyReLU(0.2)(disc_model)
+        else:
+            disc_model = Activation(activation)(disc_model)
         curr_conv_filters *= 2
     disc_model = Flatten()(disc_model)
-    disc_model = Dense(1)(disc_model)
+    disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
     return discriminator
@@ -104,7 +151,10 @@ def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
     gen_model = Dense(num_hidden)(gen_model)
-    gen_model = Activation(activation)(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
     gen_model = Dense(num_outputs)(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
@@ -129,7 +179,10 @@ def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, 
     disc_sample_flat = Flatten()(disc_sample_input)
     disc_model = concatenate([disc_cond_input, disc_sample_flat])
     disc_model = Dense(num_hidden)(disc_model)
-    disc_model = Activation(activation)(disc_model)
+    if activation == "leaky":
+        disc_model = LeakyReLU(0.2)(disc_model)
+    else:
+        disc_model = Activation(activation)(disc_model)
     disc_model = Dense(1)(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)

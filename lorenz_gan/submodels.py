@@ -33,8 +33,8 @@ class SubModelHist(object):
         sampled_u = np.zeros(cond_x.shape)
         for c, cond_x_val in enumerate(cond_x_filtered):
             x_bin = np.searchsorted(self.x_bins, cond_x_val)
-            sampled_u[c] = rv_histogram(self.histogram[x_bin]).ppf(random_percentile[c])
-        return sampled_u
+            sampled_u[c] = rv_histogram((self.histogram[:, x_bin[0]], self.u_bins)).ppf(random_percentile[c])
+        return sampled_u.ravel()
 
 
 class AR1RandomUpdater(object):

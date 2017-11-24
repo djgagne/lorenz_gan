@@ -94,8 +94,7 @@ def l96_forecast_step(X, F):
 
 
 def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, time_step=0.005,
-                          x_time_lag=2, random_seed=55):
-    np.random.seed(random_seed)
+                          x_time_lag=2):
     X_out = np.zeros((num_steps + 1 + x_time_lag, X.size))
     steps = np.arange(num_steps + 1)
     times = steps * time_step
@@ -104,13 +103,14 @@ def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, 
     k2_dXdt = np.zeros(X.shape)
     random_values = np.random.normal(size=(X.size, num_random))
     for n in range(1, num_steps + 1):
+        print(n)
         k1_dXdt[:] = l96_forecast_step(X, F) - u_model.predict(X_out[n - x_time_lag - 1: n].T, random_values)
         X_out[n] = X + k1_dXdt * time_step
         k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - u_model.predict(X_out[n - x_time_lag: n + 1].T,
                                                                                      random_values)
         X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
         X_out[n + x_time_lag] = X
-        random_values = random_updater(random_values)
+        random_values = random_updater.update(random_values)
     return X_out[x_time_lag:], times, steps
 
 

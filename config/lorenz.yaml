@@ -18,22 +18,28 @@ gan:
         num_cond_inputs: 3
         num_random_inputs: 20
         num_outputs: 32
-        activation: elu
-        min_conv_filters: 16
-        min_data_width: 2
-        filter_width: 5
+        activation: selu
+        min_conv_filters: 32
+        min_data_width: 4
+        filter_width: 4
     discriminator:
         num_cond_inputs: 3
         num_sample_inputs: 32
-        activation: relu
-        min_conv_filters: 16
-        min_data_width: 2
-        filter_width: 5
+        activation: selu
+        min_conv_filters: 32
+        min_data_width: 4
+        filter_width: 4
     gan_path: ./exp
     batch_size: 128
     gan_index: 0
     loss: binary_crossentropy
-    num_epochs: [1, 5, 10]
+    num_epochs: [1, 2, 5]
     metrics: ["accuracy"]
+random_updater:
+    out_file: ./exp/ar1_random_updater.pkl
+histogram:
+    num_x_bins: 30
+    num_u_bins: 30
+    out_file: ./exp/u_histogram.pkl
 output_nc_file: ./exp/lorenz_output.nc
 output_csv_file: ./exp/lorenz_combined_output.csv
