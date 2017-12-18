@@ -12,3 +12,17 @@ unresolved state?
     * Weather forecast problem
     * Constant climate problem
     * Climate change problem
+
+* Forecast metrics
+    * RMSE of ensemble mean vs. ensemble spread
+    * Reliability of different ensemble forecasts
+    * RPSS
+    * Extreme scores
+    * Sharpness
+    * Hellinger distance (pdf of observed state to forecast state)
+* Climate Metrics
+    * Quantile-quantile plot
+    * Autocorrelation function in time for given X
+    * Spatial autocorrelation averaged over all X locations
+    * PDFs of X values and comparison with truth PDF
+    * Hellinger distance on climatological PDF of forecast vs truth

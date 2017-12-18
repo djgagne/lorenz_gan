@@ -15,25 +15,25 @@ gan:
     x_skip: 1
     output: sample
     generator:
-        num_cond_inputs: 3
+        num_cond_inputs: 1
         num_random_inputs: 20
         num_outputs: 32
         activation: selu
-        min_conv_filters: 32
+        min_conv_filters: 64
         min_data_width: 4
         filter_width: 4
     discriminator:
-        num_cond_inputs: 3
+        num_cond_inputs: 1
         num_sample_inputs: 32
         activation: selu
-        min_conv_filters: 32
+        min_conv_filters: 64
         min_data_width: 4
         filter_width: 4
     gan_path: ./exp
     batch_size: 128
     gan_index: 0
     loss: binary_crossentropy
-    num_epochs: [1, 2, 5]
+    num_epochs: [1, 2, 5, 10]
     metrics: ["accuracy"]
 random_updater:
     out_file: ./exp/ar1_random_updater.pkl
