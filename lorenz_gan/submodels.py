@@ -1,16 +1,26 @@
 from keras.models import load_model
-import pickle
+import keras.backend as K
 import numpy as np
+from os.path import join
+import pandas as pd
 from scipy.stats import rv_histogram, norm
+from lorenz_gan.gan import Interpolate1D, unnormalize_data
 
 
 class SubModelGAN(object):
     def __init__(self, model_path):
         self.model_path = model_path
-        self.model = load_model(self.model_path)
+        self.model_path_start = "/".join(model_path.split("/")[:-1])
+        self.model_config = model_path.split("/")[-1].split("_")[2]
+        self.model = load_model(self.model_path, custom_objects={"Interpolate1D": Interpolate1D})
+        self.pred_func = K.function(self.model.input + [K.learning_phase()], [self.model.output])
+        self.scaling_file = join(self.model_path_start, "gan_Y_scaling_values_{0}.csv".format(self.model_config))
+        self.scaling_values = pd.read_csv(self.scaling_file, index_col="Channel")
 
     def predict(self, cond_x, random_x):
-        return self.model.predict([cond_x, random_x]).sum(axis=1)
+        predictions = unnormalize_data(self.pred_func([cond_x, random_x, True])[0],
+                                       self.scaling_values)[:, :, 0].sum(axis=1).ravel()
+        return predictions
 
 
 class SubModelHist(object):

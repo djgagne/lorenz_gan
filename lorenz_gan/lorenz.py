@@ -103,11 +103,11 @@ def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, 
     k2_dXdt = np.zeros(X.shape)
     random_values = np.random.normal(size=(X.size, num_random))
     for n in range(1, num_steps + 1):
-        print(n)
-        k1_dXdt[:] = l96_forecast_step(X, F) - u_model.predict(X_out[n - x_time_lag - 1: n].T, random_values)
-        X_out[n] = X + k1_dXdt * time_step
-        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - u_model.predict(X_out[n - x_time_lag: n + 1].T,
-                                                                                     random_values)
+        sub_grid_1 = u_model.predict(X_out[n - x_time_lag - 1: n].T, random_values)
+        k1_dXdt[:] = l96_forecast_step(X, F) - sub_grid_1
+        X_out[n - x_time_lag] = X + k1_dXdt * time_step
+        sub_grid_2 = u_model.predict(X_out[n - x_time_lag: n + 1].T, random_values)
+        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - sub_grid_2
         X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
         X_out[n + x_time_lag] = X
         random_values = random_updater.update(random_values)

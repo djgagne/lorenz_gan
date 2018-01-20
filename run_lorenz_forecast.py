@@ -7,6 +7,7 @@ from lorenz_gan.lorenz import run_lorenz96_forecast
 from lorenz_gan.submodels import SubModelGAN
 from multiprocessing import Pool
 import pickle
+import traceback
 from os.path import join
 
 def main():
@@ -37,12 +38,12 @@ def main():
     x_initial = lorenz_output["lorenz_x"][initial_step].values
     if args.proc == 1:
         for member in range(config["num_members"]):
-            launch_forecast_member(member, x_initial, F, u_model, random_updater, num_steps, num_random, time_step,
+            launch_forecast_member(member, np.copy(x_initial), F, u_model, random_updater, num_steps, num_random, time_step,
                                    x_time_lag, random_seeds[member], out_path)
     else:
         pool = Pool(args.proc)
         for member in range(config["num_members"]):
-            pool.apply_async(launch_forecast_member, (member, x_initial, F, u_model, random_updater, num_steps,
+            pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), F, u_model, random_updater, num_steps,
                                                       num_random, time_step,
                                                       x_time_lag, random_seeds[member], out_path))
         pool.close()
@@ -52,17 +53,21 @@ def main():
 
 def launch_forecast_member(member_number, x_initial, F, u_model, random_updater, num_steps, num_random, time_step,
                            x_time_lag, random_seed, out_path):
-    print("Starting member {0:d}".format(member_number))
-    np.random.seed(random_seed)
-    x_out, times, steps = run_lorenz96_forecast(x_initial, F, u_model, random_updater, num_steps, num_random,
-                                                time_step, x_time_lag)
-    x_data = {"time": times, "step": steps}
-    x_cols = []
-    for i in range(x_out.shape[1]):
-        x_cols.append("X_{0:d}".format(i))
-        x_data[x_cols[-1]] = x_out[:, i]
-    x_frame = pd.DataFrame(x_data, columns=["time", "step"] + x_cols)
-    x_frame.to_csv(join(out_path, "lorenz_forecast_{0:02d}.csv".format(member_number)), index=False)
+    try:
+        print("Starting member {0:d}".format(member_number))
+        np.random.seed(random_seed)
+        x_out, times, steps = run_lorenz96_forecast(x_initial, F, u_model, random_updater, num_steps, num_random,
+                                                    time_step, x_time_lag)
+        x_data = {"time": times, "step": steps}
+        x_cols = []
+        for i in range(x_out.shape[1]):
+            x_cols.append("X_{0:d}".format(i))
+            x_data[x_cols[-1]] = x_out[:, i]
+        x_frame = pd.DataFrame(x_data, columns=["time", "step"] + x_cols)
+        x_frame.to_csv(join(out_path, "lorenz_forecast_{0:02d}.csv".format(member_number)), index=False)
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
     return
 
 

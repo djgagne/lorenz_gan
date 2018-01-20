@@ -1,5 +1,5 @@
-from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization
-from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer
+from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
+from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer, MaxPool1D
 import keras.backend as K
 from keras.optimizers import Adam
 import xarray as xr
@@ -37,8 +37,27 @@ class Interpolate1D(Layer):
         return output
 
 
+def predict_stochastic(neural_net):
+    """
+    Have the neural network make predictions with the Dropout layers on, resulting in stochastic behavior from the
+    neural net itself.
+
+    Args:
+        neural_net:
+        data:
+
+    Returns:
+
+    """
+    input = neural_net.input
+    output = neural_net.output
+    pred_func = K.function(input + [K.learning_phase()], [output])
+    return pred_func
+
+
 def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
-                   activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3):
+                   activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3,
+                   dropout_alpha=0.2):
     """
     Convolutional conditional generator neural network. The conditional generator takes a combined vector of
     normalized conditional and random values and outputs normalized synthetic examples of the training data.
@@ -70,8 +89,12 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     else:
         gen_model = Activation(activation)(gen_model)
     gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
+    if activation == "selu":
+        gen_model = AlphaDropout(dropout_alpha)(gen_model)
+    else:
+        gen_model = Dropout(dropout_alpha)(gen_model)
     gen_model = concatenate([gen_model, gen_cond_repeat])
-    #gen_model = BatchNormalization()(gen_model)
+    gen_model = BatchNormalization()(gen_model)
     for i in range(0, num_layers):
         curr_conv_filters //= 2
         gen_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
@@ -79,22 +102,21 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
+        gen_model = BatchNormalization()(gen_model)
+        if activation == "selu":
+            gen_model = AlphaDropout(dropout_alpha)(gen_model)
+        else:
+            gen_model = Dropout(dropout_alpha)(gen_model)
         gen_model = Interpolate1D()(gen_model)
-        #gen_model = BatchNormalization()(gen_model)
-    gen_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
-    if activation == "leaky":
-        gen_model = LeakyReLU(0.2)(gen_model)
-    else:
-        gen_model = Activation(activation)(gen_model)
+    #gen_model = concatenate([gen_model, gen_cond_repeat])
     gen_model = Conv1D(1, 3, padding="same", kernel_regularizer=l2())(gen_model)
-    gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
 
 def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
                        min_conv_filters=8, min_data_width=4,
-                       filter_width=3):
+                       filter_width=3, dropout_alpha=0.5):
     """
     Convolutional conditional discriminator neural network architecture. The conditional discriminator takes the
     conditional vector and a real or synthetic sample and predicts the probability that the sample is real or not.
@@ -120,20 +142,24 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
     curr_conv_filters = min_conv_filters
     for i in range(num_layers):
         disc_model = Conv1D(curr_conv_filters, filter_width,
-                            strides=2, padding="same", kernel_regularizer=l2())(disc_model)
+                            strides=1, padding="same", kernel_regularizer=l2())(disc_model)
         if activation == "leaky":
             disc_model = LeakyReLU(0.2)(disc_model)
         else:
             disc_model = Activation(activation)(disc_model)
+        disc_model = MaxPool1D()(disc_model)
+        disc_model = Dropout(dropout_alpha)(disc_model)
         curr_conv_filters *= 2
     disc_model = Flatten()(disc_model)
+    disc_model = Dropout(dropout_alpha)(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
     return discriminator
 
 
-def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_outputs=32, activation="selu"):
+def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden=20, num_outputs=32,
+                    dropout_alpha=0.2, activation="selu"):
     """
     Dense conditional generator network. Includes 1 hidden layer.
 
@@ -150,12 +176,16 @@ def generator_dense(num_cond_inputs=3, num_random_inputs=10, num_hidden=20, num_
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
-    gen_model = Dense(num_hidden)(gen_model)
+    gen_model = Dense(num_hidden, kernel_regularizer=l2())(gen_model)
     if activation == "leaky":
         gen_model = LeakyReLU(0.2)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
-    gen_model = Dense(num_outputs)(gen_model)
+    if activation == "selu":
+        gen_model = AlphaDropout(dropout_alpha)(gen_model)
+    else:
+        gen_model = Dropout(dropout_alpha)(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
@@ -178,12 +208,12 @@ def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, 
     disc_sample_input = Input(shape=(num_sample_inputs, 1))
     disc_sample_flat = Flatten()(disc_sample_input)
     disc_model = concatenate([disc_cond_input, disc_sample_flat])
-    disc_model = Dense(num_hidden)(disc_model)
+    disc_model = Dense(num_hidden, kernel_regularizer=l2())(disc_model)
     if activation == "leaky":
         disc_model = LeakyReLU(0.2)(disc_model)
     else:
         disc_model = Activation(activation)(disc_model)
-    disc_model = Dense(1)(disc_model)
+    disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
     return discriminator
@@ -313,6 +343,7 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
     hist_cols = ["Epoch", "Batch", "Disc Loss"] + ["Disc " + m for m in metrics] + \
                 ["Gen Loss"] + ["Gen " + m for m in metrics]
     # Loop over each epoch
+    gen_pred_func = predict_stochastic(generator)
     for epoch in range(1, max(num_epochs) + 1):
         np.random.shuffle(train_order)
         # Loop over all of the random training batches
@@ -325,8 +356,10 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
             combo_cond_data_batch[:batch_half] = train_cond_data[train_order[b_index - batch_half: b_index]]
             combo_cond_data_batch[batch_half:] = generate_random_condition_data(batch_half, train_cond_data.shape[1],
                                                                                 train_cond_exp_scale)
-            combo_data_batch[batch_half:] = generator.predict_on_batch([combo_cond_data_batch[batch_half:, :, 0],
-                                                                        batch_vec[batch_half:]])
+            combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:, :, 0],
+                                                           batch_vec[batch_half:], True])[0]
+            #combo_data_batch[batch_half:] = generator.predict_on_batch([combo_cond_data_batch[batch_half:, :, 0],
+            #                                                            batch_vec[batch_half:]])
             disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch[:, :, 0],
                                                                    combo_data_batch],
                                                                   batch_labels))
@@ -347,7 +380,7 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
             gen_noise = np.random.normal(size=(epoch_sample_size, random_vec_size))
             gen_cond_noise = generate_random_condition_data(epoch_sample_size, train_cond_data.shape[1],
                                                             train_cond_exp_scale)
-            gen_data_epoch = unnormalize_data(generator.predict([gen_cond_noise[:, :, 0], gen_noise]),
+            gen_data_epoch = unnormalize_data(gen_pred_func([gen_cond_noise[:, :, 0], gen_noise, True])[0],
                                               sample_scaling_values)
             cond_data_epoch = unnormalize_data(gen_cond_noise, cond_scaling_values)
             gen_da = {}
