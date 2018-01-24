@@ -56,7 +56,8 @@ def launch_forecast_member(member_number, x_initial, F, u_model, random_updater,
     try:
         print("Starting member {0:d}".format(member_number))
         np.random.seed(random_seed)
-        x_out, times, steps = run_lorenz96_forecast(x_initial, F, u_model, random_updater, num_steps, num_random,
+        x_out, times, steps = run_lorenz96_forecast(x_initial + np.random.normal(0, 0.01, size=x_initial.shape),
+                                                    F, u_model, random_updater, num_steps, num_random,
                                                     time_step, x_time_lag)
         x_data = {"time": times, "step": steps}
         x_cols = []

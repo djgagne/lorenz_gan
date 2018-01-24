@@ -2,7 +2,7 @@ from setuptools import setup
 
 if __name__ == "__main__":
     setup(name="lorenz_gan",
-          verson="0.1",
+          version="0.1",
           description="Testbed for stochastic parameterizations of the Lorenz '96 model.",
           author="David John Gagne",
           author_email="dgagne@ucar.edu",

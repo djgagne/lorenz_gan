@@ -1,5 +1,6 @@
 from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
 from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer, MaxPool1D
+from keras.initializers import RandomNormal
 import keras.backend as K
 from keras.optimizers import Adam
 import xarray as xr
@@ -32,7 +33,7 @@ class Interpolate1D(Layer):
                 combined_values.append(inputs[:, j: j + 1, :])
                 j += 1
             else:
-                combined_values.append(0.5 * inputs[:, j:j + 1, :] - 0.5 * inputs[:, j - 1: j, :])
+                combined_values.append(0.5 * inputs[:, j:j + 1, :] + 0.5 * inputs[:, j - 1: j, :])
         output = K.concatenate(combined_values, axis=1)
         return output
 
@@ -77,39 +78,49 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
         generator: Keras Model object of the generator network
     """
     num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
-    max_conv_filters = int(min_conv_filters * 2 ** (num_layers - 1))
+    max_conv_filters = int(min_conv_filters * 2 ** (num_layers))
     curr_conv_filters = max_conv_filters
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_cond_repeat = RepeatVector(min_data_width)(gen_cond_input)
     gen_rand_input = Input(shape=(num_random_inputs, ))
     #gen_model = concatenate([gen_cond_input, gen_rand_input])
-    gen_model = Dense(min_data_width * max_conv_filters)(gen_rand_input)
-    if activation == "leaky":
-        gen_model = LeakyReLU(0.2)(gen_model)
-    else:
-        gen_model = Activation(activation)(gen_model)
+    gen_model = gen_rand_input
+    gen_model = Dense(min_data_width * max_conv_filters)(gen_model)
+    #if activation == "leaky":
+    #    gen_model = LeakyReLU(0.2)(gen_model)
+    #else:
+    #    gen_model = Activation(activation)(gen_model)
     gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
-    if activation == "selu":
-        gen_model = AlphaDropout(dropout_alpha)(gen_model)
-    else:
-        gen_model = Dropout(dropout_alpha)(gen_model)
     gen_model = concatenate([gen_model, gen_cond_repeat])
-    gen_model = BatchNormalization()(gen_model)
+
+    # if activation == "selu":
+    #     gen_model = AlphaDropout(dropout_alpha)(gen_model)
+    # else:
+    #     gen_model = Dropout(dropout_alpha)(gen_model)
+    # gen_model = BatchNormalization()(gen_model)
+    data_width = min_data_width
     for i in range(0, num_layers):
         curr_conv_filters //= 2
-        gen_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+        if data_width < filter_width:
+            f_width = 3
+        else:
+            f_width = filter_width
+        gen_model = Conv1D(curr_conv_filters, f_width, padding="same", kernel_regularizer=l2())(gen_model)
         if activation == "leaky":
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
-        gen_model = BatchNormalization()(gen_model)
+        #gen_model = BatchNormalization()(gen_model)
         if activation == "selu":
             gen_model = AlphaDropout(dropout_alpha)(gen_model)
         else:
             gen_model = Dropout(dropout_alpha)(gen_model)
         gen_model = Interpolate1D()(gen_model)
+        data_width *= 2
+        #gen_model = UpSampling1D()(gen_model)
     #gen_model = concatenate([gen_model, gen_cond_repeat])
-    gen_model = Conv1D(1, 3, padding="same", kernel_regularizer=l2())(gen_model)
+    gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+    gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
@@ -147,9 +158,17 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
             disc_model = LeakyReLU(0.2)(disc_model)
         else:
             disc_model = Activation(activation)(disc_model)
+        #if i > 0:
+        #    disc_model = BatchNormalization()(disc_model)
         disc_model = MaxPool1D()(disc_model)
         disc_model = Dropout(dropout_alpha)(disc_model)
         curr_conv_filters *= 2
+    disc_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(disc_model)
+    if activation == "leaky":
+        disc_model = LeakyReLU(0.2)(disc_model)
+    else:
+        disc_model = Activation(activation)(disc_model)
+    #disc_model = BatchNormalization()(disc_model)
     disc_model = Flatten()(disc_model)
     disc_model = Dropout(dropout_alpha)(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2())(disc_model)

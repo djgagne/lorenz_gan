@@ -154,12 +154,15 @@ def train_lorenz_gan(config, combined_data):
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])
-    optimizer = Adam(lr=0.0001, beta_1=0.5)
+    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5)
     loss = config["gan"]["loss"]
     gen_disc = initialize_gan(gen_model, disc_model, loss, optimizer, config["gan"]["metrics"])
     if trim > 0:
         Y_norm = Y_norm[:-trim]
         X_norm = X_norm[:-trim]
+    print(X_norm.min(), X_norm.max(), X_norm.mean(), X_norm.std())
+    print(X_norm.shape)
+    print(X_series.shape)
     train_gan(Y_norm, X_norm, gen_model, disc_model, gen_disc, config["gan"]["batch_size"],
               config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"],
