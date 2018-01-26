@@ -19,7 +19,7 @@ class SubModelGAN(object):
 
     def predict(self, cond_x, random_x):
         predictions = unnormalize_data(self.pred_func([cond_x, random_x, True])[0],
-                                       self.scaling_values)[:, :, 0].sum(axis=1).ravel()
+                                       self.scaling_values)[:, :, 0].sum(axis=1)
         return predictions
 
 

@@ -18,12 +18,7 @@ def main():
     config_file = args.config
     with open(config_file) as config_obj:
         config = yaml.load(config_obj)
-    if config["u_model_path"][-2:] == "h5":
-        u_model = SubModelGAN(config["u_model_path"])
-    else:
-        with open(config["u_model_path"], "rb") as u_model_file:
-            u_model = pickle.load(u_model_file)
-            print(u_model.histogram)
+    u_model_path = config["u_model_path"]
     with open(config["random_updater_path"], "rb") as random_updater_file:
         random_updater = pickle.load(random_updater_file)
     num_steps = config["num_steps"]
@@ -38,12 +33,12 @@ def main():
     x_initial = lorenz_output["lorenz_x"][initial_step].values
     if args.proc == 1:
         for member in range(config["num_members"]):
-            launch_forecast_member(member, np.copy(x_initial), F, u_model, random_updater, num_steps, num_random, time_step,
+            launch_forecast_member(member, np.copy(x_initial), F, u_model_path, random_updater, num_steps, num_random, time_step,
                                    x_time_lag, random_seeds[member], out_path)
     else:
         pool = Pool(args.proc)
         for member in range(config["num_members"]):
-            pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), F, u_model, random_updater, num_steps,
+            pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), F, u_model_path, random_updater, num_steps,
                                                       num_random, time_step,
                                                       x_time_lag, random_seeds[member], out_path))
         pool.close()
@@ -51,12 +46,18 @@ def main():
     return
 
 
-def launch_forecast_member(member_number, x_initial, F, u_model, random_updater, num_steps, num_random, time_step,
+def launch_forecast_member(member_number, x_initial, F, u_model_path, random_updater, num_steps, num_random, time_step,
                            x_time_lag, random_seed, out_path):
     try:
+        if u_model_path[-2:] == "h5":
+            u_model = SubModelGAN(u_model_path)
+        else:
+            with open(u_model_path, "rb") as u_model_file:
+                u_model = pickle.load(u_model_file)
+                print(u_model.histogram)
         print("Starting member {0:d}".format(member_number))
         np.random.seed(random_seed)
-        x_out, times, steps = run_lorenz96_forecast(x_initial + np.random.normal(0, 0.01, size=x_initial.shape),
+        x_out, times, steps = run_lorenz96_forecast(x_initial,
                                                     F, u_model, random_updater, num_steps, num_random,
                                                     time_step, x_time_lag)
         x_data = {"time": times, "step": steps}

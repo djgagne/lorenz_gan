@@ -5,7 +5,7 @@ u_model_name: gan
 u_model_path: ./exp/gan_generator_0000_epoch_0010.h5
 random_updater_path: ./exp/ar1_random_updater.pkl
 num_steps: 1000
-num_random: 1
+num_random: 4
 time_step: 0.005
 x_time_lag: 0
 random_seeds: [450, 500, 550, 600, 650, 700, 750, 800, 850, 900]

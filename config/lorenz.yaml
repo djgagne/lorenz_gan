@@ -16,17 +16,17 @@ gan:
     output: sample
     generator:
         num_cond_inputs: 1
-        num_random_inputs: 1
+        num_random_inputs: 4
         num_outputs: 32
-        activation: selu
+        activation: leaky
         min_conv_filters: 8
         min_data_width: 4
         filter_width: 5
-        dropout_alpha: 0.2
+        dropout_alpha: 0.5
     discriminator:
         num_cond_inputs: 1
         num_sample_inputs: 32
-        activation: selu
+        activation: leaky
         min_conv_filters: 8
         min_data_width: 4
         filter_width: 5
@@ -35,7 +35,7 @@ gan:
     batch_size: 128
     gan_index: 0
     loss: binary_crossentropy
-    learning_rate: 0.0005
+    learning_rate: 0.001
     num_epochs: [1, 2, 3, 4, 5, 8, 10]
     metrics: ["accuracy"]
 random_updater:

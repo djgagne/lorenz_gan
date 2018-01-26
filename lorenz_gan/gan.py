@@ -83,16 +83,20 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_cond_repeat = RepeatVector(min_data_width)(gen_cond_input)
     gen_rand_input = Input(shape=(num_random_inputs, ))
-    #gen_model = concatenate([gen_cond_input, gen_rand_input])
-    gen_model = gen_rand_input
-    gen_model = Dense(min_data_width * max_conv_filters)(gen_model)
+    gen_model = Reshape((num_random_inputs, 1))(gen_rand_input)
+    gen_model = Conv1D(max_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
+    #gen_model = Dense(min_data_width * max_conv_filters)(gen_model)
     #if activation == "leaky":
     #    gen_model = LeakyReLU(0.2)(gen_model)
     #else:
     #    gen_model = Activation(activation)(gen_model)
-    gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
+    #gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
     gen_model = concatenate([gen_model, gen_cond_repeat])
-
+    gen_model = Dropout(dropout_alpha)(gen_model)
     # if activation == "selu":
     #     gen_model = AlphaDropout(dropout_alpha)(gen_model)
     # else:
@@ -112,7 +116,7 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
             gen_model = Activation(activation)(gen_model)
         #gen_model = BatchNormalization()(gen_model)
         if activation == "selu":
-            gen_model = AlphaDropout(dropout_alpha)(gen_model)
+            gen_model = Dropout(dropout_alpha)(gen_model)
         else:
             gen_model = Dropout(dropout_alpha)(gen_model)
         gen_model = Interpolate1D()(gen_model)
