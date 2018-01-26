@@ -69,14 +69,14 @@ def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
         print(n)
         k1_dXdt[:], k1_dYdt[:] = l96_truth_step(X, Y, h, F, b, c)
         k2_dXdt[:], k2_dYdt[:] = l96_truth_step(X + k1_dXdt * time_step / 2,
-                                          Y + k1_dYdt * time_step / 2,
-                                          h, F, b, c)
+                                                Y + k1_dYdt * time_step / 2,
+                                                h, F, b, c)
         k3_dXdt[:], k3_dYdt[:] = l96_truth_step(X + k2_dXdt * time_step / 2,
-                                          Y + k2_dYdt * time_step / 2,
-                                          h, F, b, c)
+                                                Y + k2_dYdt * time_step / 2,
+                                                h, F, b, c)
         k4_dXdt[:], k4_dYdt[:] = l96_truth_step(X + k3_dXdt * time_step,
-                                          Y + k3_dYdt * time_step,
-                                          h, F, b, c)
+                                                Y + k3_dYdt * time_step,
+                                                h, F, b, c)
         X += (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
         Y += (k1_dYdt + 2 * k2_dYdt + 2 * k3_dYdt + k4_dYdt) / 6 * time_step
         X_out[n] = X
@@ -104,10 +104,11 @@ def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, 
     random_values = np.random.normal(size=(X.size, num_random))
     for n in range(1, num_steps + 1):
         sub_grid_1 = u_model.predict(X_out[n - x_time_lag - 1: n].T, random_values)
+        print(X[0], sub_grid_1[0])
         k1_dXdt[:] = l96_forecast_step(X, F) - sub_grid_1
         X_out[n - x_time_lag] = X + k1_dXdt * time_step
-        sub_grid_2 = u_model.predict(X_out[n - x_time_lag: n + 1].T, random_values)
-        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - sub_grid_2
+        #sub_grid_2 = u_model.predict(X_out[n - x_time_lag: n + 1].T, random_values)
+        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - sub_grid_1
         X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
         X_out[n + x_time_lag] = X
         random_values = random_updater.update(random_values)
