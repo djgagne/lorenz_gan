@@ -16,11 +16,11 @@ gan:
     output: sample
     generator:
         num_cond_inputs: 1
-        num_random_inputs: 4
+        num_random_inputs: 8
         num_outputs: 32
         activation: leaky
         min_conv_filters: 8
-        min_data_width: 4
+        min_data_width: 8
         filter_width: 5
         dropout_alpha: 0.5
     discriminator:
@@ -28,7 +28,7 @@ gan:
         num_sample_inputs: 32
         activation: leaky
         min_conv_filters: 8
-        min_data_width: 4
+        min_data_width: 8
         filter_width: 5
         dropout_alpha: 0.1
     gan_path: ./exp
