@@ -25,7 +25,12 @@ def main():
     num_random = config["num_random"]
     time_step = config["time_step"]
     x_time_lag = config["x_time_lag"]
-    random_seeds = config["random_seeds"]
+    if len(config["random_seeds"]) != config["num_members"]:
+        random_seeds = np.linspace(config["random_seeds"][0],
+                                   config["random_seeds"][1],
+                                   config["num_members"]).astype(int)
+    else:
+        random_seeds = config["random_seeds"]
     initial_step = config["initial_step"]
     out_path = config["out_path"]
     F = config["F"]

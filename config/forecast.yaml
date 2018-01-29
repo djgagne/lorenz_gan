@@ -1,4 +1,4 @@
-num_members: 10
+num_members: 40
 initial_x: []
 F: 30
 u_model_name: hist
@@ -8,7 +8,7 @@ num_steps: 200
 num_random: 1
 time_step: 0.005
 x_time_lag: 0
-random_seeds: [450, 500, 550, 600, 650, 700, 750, 800, 850, 900]
+random_seeds: [5000, 6000]
 initial_step: 100000
 lorenz_nc_file: ./exp/lorenz_output.nc
 out_path: ./exp_hist/
