@@ -86,6 +86,16 @@ def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
 
 @jit(nopython=True, cache=True)
 def l96_forecast_step(X, F):
+    """
+    Calculate the tendency of the Lorenz 96 Forecast Model dynamics
+
+    Args:
+        X (ndarray): Array of x values at a given time step
+        F (float): Forcing value
+
+    Returns:
+        dXdt: the time tendency of the Xs
+    """
     K = X.size
     dXdt = np.zeros(X.size)
     for k in range(K):
@@ -93,29 +103,58 @@ def l96_forecast_step(X, F):
     return dXdt
 
 
-def run_lorenz96_forecast(X, F, u_model, random_updater, num_steps, num_random, time_step=0.005,
-                          x_time_lag=2):
-    X_out = np.zeros((num_steps + 1 + x_time_lag, X.size))
-    steps = np.arange(num_steps + 1)
+def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps,
+                          num_random, time_step=0.005):
+    """
+    Integrate the Lorenz 96 forecast model forward in time from a specified initial state with
+    a parameterized subgrid forcing model. The u_model should contain a predict method that
+    returns an array of U values
+
+    Args:
+        x_initial (ndarray): Initial x values
+        f (float): Constant forcing value
+        u_model: Sub-grid parameterization model
+        random_updater: Method for updating the random values
+        num_steps (int): Number of integration time steps
+        num_random (int): Number of random values used by the parameterization
+        time_step (float): Size of the integration time step in MTUs
+
+    Returns:
+        output:
+    """
+    steps = np.arange(num_steps)
     times = steps * time_step
-    X_out[0: x_time_lag + 1] = X
+    X = np.zeros(x_initial.shape)
+    X[:] = x_initial[:]
+    coords = {"step": steps, "x_size": np.arange(x_initial.size)}
+    X_out = xr.DataArray(np.zeros((num_steps, X.size)),
+                         coords=coords, dims=("step", "x_size"),
+                         attrs={"long_name": "x values"})
+    U_out = xr.DataArray(np.zeros((num_steps, X.size)),
+                         coords=coords, dims=("step", "x_size"),
+                         attrs={"long_name": "u values"})
+    X_out[0] = X
+    U_out[0] = u_initial
     k1_dXdt = np.zeros(X.shape)
     k2_dXdt = np.zeros(X.shape)
+    k3_dXdt = np.zeros(X.shape)
+    k4_dXdt = np.zeros(X.shape)
     random_values = np.random.normal(size=(X.size, num_random))
-    for n in range(1, num_steps + 1):
-        sub_grid_1 = u_model.predict(X_out[n - x_time_lag - 1: n].T, random_values)
-        print(X[0], sub_grid_1[0])
-        k1_dXdt[:] = l96_forecast_step(X, F) - sub_grid_1
-        X_out[n - x_time_lag] = X + k1_dXdt * time_step
-        #sub_grid_2 = u_model.predict(X_out[n - x_time_lag: n + 1].T, random_values)
-        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, F) - sub_grid_1
-        X += 0.5 * (k1_dXdt + k2_dXdt) * time_step
-        X_out[n + x_time_lag] = X
+    for n in range(1, num_steps):
+        U_out[n] = u_model.predict(X_out[n - 1: n].T, random_values)
+        k1_dXdt[:] = l96_forecast_step(X, f) - U_out[n]
+        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * 0.5 * time_step, f) - U_out[n]
+        k3_dXdt[:] = l96_forecast_step(X + k1_dXdt * 0.5 * time_step, f) - U_out[n]
+        k4_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, f) - U_out[n]
+        X += (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
+        X_out[n] = X
         random_values = random_updater.update(random_values)
-    return X_out[x_time_lag:], times, steps
+    output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, time=times),
+                        coords=coords)
+    return output
 
 
-def process_lorenz_data(X_out, Y_out, times, steps, cond_inputs, J, x_skip, t_skip):
+def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
     """
     Sample from Lorenz model output and reformat the data into a format more amenable to machine learning.
 
@@ -123,7 +162,6 @@ def process_lorenz_data(X_out, Y_out, times, steps, cond_inputs, J, x_skip, t_sk
     Args:
         X_out (ndarray): Lorenz 96 model output
         Y_out (ndarray):
-        cond_inputs (int): number of lagged X values to associate with each set of Ys
         J (int): number of Y variables per X variable
         x_skip (int): number of X variables to skip when sampling the data
         t_skip (int): number of time steps to skip when sampling the data
@@ -133,30 +171,36 @@ def process_lorenz_data(X_out, Y_out, times, steps, cond_inputs, J, x_skip, t_sk
     """
     X_series_list = []
     Y_series_list = []
+    U_series_list = []
     x_s = np.arange(0, X_out.shape[1], x_skip)
-    t_s = np.arange(cond_inputs, X_out.shape[0], t_skip)
+    t_s = np.arange(0, X_out.shape[0] - 1, t_skip)
     time_list = []
     step_list = []
     x_list = []
     for k in x_s:
-        X_series_list.append(np.stack([X_out[i:i-cond_inputs:-1, k]
-                             for i in t_s], axis=0))
-        Y_series_list.append(Y_out[cond_inputs::t_skip, k * J: (k+1) * J])
-        time_list.append(times[cond_inputs::t_skip])
-        step_list.append(steps[cond_inputs::t_skip])
+        X_series_list.append(X_out[t_s, k: k + 1])
+        Y_series_list.append(Y_out[1::t_skip, k * J: (k+1) * J])
+        U_series_list.append(np.expand_dims(u_scale * Y_out[t_s, k * J: (k+1) * J].sum(axis=1), 1))
+        time_list.append(times[t_s])
+        step_list.append(steps[t_s])
         x_list.append(np.ones(time_list[-1].size) * k)
+
     X_series = np.vstack(X_series_list)
     Y_series = np.vstack(Y_series_list)
+    U_series = np.vstack(U_series_list)
+    print(X_series.shape, Y_series.shape, U_series.shape)
     x_cols = ["X_t"]
-    if cond_inputs > 1:
-        x_cols += ["X_t-{0:d}".format(t) for t in range(1, cond_inputs)]
     y_cols = ["Y_{0:d}".format(y) for y in range(J)]
+    u_col = "U_t"
     combined_data = pd.DataFrame(X_series, columns=x_cols)
     combined_data = pd.concat([combined_data, pd.DataFrame(Y_series, columns=y_cols)], axis=1)
     combined_data.loc[:, "time"] = np.concatenate(time_list)
     combined_data.loc[:, "step"] = np.concatenate(step_list)
     combined_data.loc[:, "x_index"] = np.concatenate(x_list)
-    return combined_data[["x_index", "step", "time"] + x_cols + y_cols]
+    combined_data.loc[:, u_col] = U_series
+    combined_data.loc[:, "u_scale"] = u_scale
+    out_cols = ["x_index", "step", "time"] + x_cols + y_cols + [u_col, 'u_scale']
+    return combined_data.loc[:, out_cols]
 
 
 def save_lorenz_output(X_out, Y_out, times, steps, model_attrs, out_file):

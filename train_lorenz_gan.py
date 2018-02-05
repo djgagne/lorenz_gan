@@ -1,7 +1,7 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data
-from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist
+from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly
 import xarray as xr
 from keras.optimizers import Adam
 import numpy as np
@@ -65,31 +65,36 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", default="lorenz.yaml", help="Config yaml file")
     parser.add_argument("-r", "--reload", action="store_true", default=False, help="Reload netCDF and csv files")
+    parser.add_argument("-g", "--gan", action="store_true", default=False, help="Train GAN")
+
     args = parser.parse_args()
     config_file = args.config
     with open(config_file) as config_obj:
         config = yaml.load(config_obj)
     if not exists(config["gan"]["gan_path"]):
         mkdir(config["gan"]["gan_path"])
+    u_scale = config["lorenz"]["h"] * config["lorenz"]["c"] / config["lorenz"]["b"]
     if args.reload:
         print("Reloading csv data")
         combined_data = pd.read_csv(config["output_csv_file"])
         lorenz_output = xr.open_dataset(config["output_nc_file"])
         X_out = lorenz_output["lorenz_x"].values
-        Y_out = lorenz_output["lorenz_y"].values
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
         combined_data = process_lorenz_data(X_out, Y_out, times, steps,
-                                            config["gan"]["generator"]["num_cond_inputs"],
                                             config["lorenz"]["J"], config["gan"]["x_skip"],
-                                            config["gan"]["t_skip"])
+                                            config["gan"]["t_skip"], u_scale)
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
         print(combined_data)
     y_cols = combined_data.columns[combined_data.columns.str.contains("Y")]
-    train_random_updater(Y_out[:, 5], config["random_updater"]["out_file"])
-    train_histogram(combined_data["X_t"].values, combined_data[y_cols].sum(axis=1).values, **config["histogram"])
-    train_lorenz_gan(config, combined_data)
+    train_random_updater(X_out[:, 5], config["random_updater"]["out_file"])
+    u_vals = u_scale * combined_data[y_cols].sum(axis=1).values
+    train_histogram(combined_data["X_t"].values,
+                    u_vals, **config["histogram"])
+    train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
+    if args.gan:
+        train_lorenz_gan(config, combined_data)
     return
 
 
@@ -126,13 +131,7 @@ def train_lorenz_gan(config, combined_data):
     Returns:
 
     """
-    x_time_lags = np.arange(config["gan"]["generator"]["num_cond_inputs"])
-    x_cols = []
-    for t in x_time_lags:
-        if t == 0:
-            x_cols.append("X_t")
-        else:
-            x_cols.append("X_t-{0:d}".format(t))
+    x_cols = config["gan"]["cond_inputs"]
     X_series = np.expand_dims(combined_data[x_cols].values, axis=-1)
     Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
                               axis=-1)
@@ -180,6 +179,14 @@ def train_histogram(x_data, u_data, num_x_bins=10, num_u_bins=10, out_file="./hi
     hist_model.fit(x_data, u_data)
     with open(out_file, "wb") as out_file_obj:
         pickle.dump(hist_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
+
+
+def train_poly(x_data, u_data, num_terms=3, noise_type="additive", out_file="./poly.pkl"):
+    poly_model = SubModelPoly(num_terms=num_terms, noise_type=noise_type)
+    poly_model.fit(x_data, u_data)
+    with open(out_file, "wb") as out_file_obj:
+        pickle.dump(poly_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
+    return
 
 
 if __name__ == "__main__":

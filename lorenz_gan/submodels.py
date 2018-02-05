@@ -5,10 +5,11 @@ from os.path import join
 import pandas as pd
 from scipy.stats import rv_histogram, norm
 from lorenz_gan.gan import Interpolate1D, unnormalize_data
+from sklearn.linear_model import LinearRegression
 
 
 class SubModelGAN(object):
-    def __init__(self, model_path):
+    def __init__(self, model_path=None):
         self.model_path = model_path
         self.model_path_start = "/".join(model_path.split("/")[:-1])
         self.model_config = model_path.split("/")[-1].split("_")[2]
@@ -24,7 +25,7 @@ class SubModelGAN(object):
 
 
 class SubModelHist(object):
-    def __init__(self, num_x_bins, num_u_bins):
+    def __init__(self, num_x_bins=20, num_u_bins=20):
         self.num_x_bins = num_x_bins
         self.num_u_bins = num_u_bins
         self.x_bins = None
@@ -59,4 +60,28 @@ class AR1RandomUpdater(object):
     def update(self, random_values):
         return self.corr * random_values + norm.rvs(size=random_values.shape,
                                                     loc=0, scale=self.noise_sd)
+
+
+class SubModelPoly(object):
+    def __init__(self, num_terms=3, noise_type="additive"):
+        self.num_terms = num_terms
+        self.model = LinearRegression()
+        self.noise_type = noise_type
+
+    def fit(self, cond_x, u):
+        x_terms = np.zeros((cond_x.shape[0], self.num_terms))
+        for p in range(1, self.num_terms + 1):
+            x_terms[:, p - 1] = cond_x ** p
+        self.model.fit(x_terms, u)
+
+    def predict(self, cond_x, random_x):
+        x_terms = np.zeros((cond_x.shape[0], self.num_terms))
+        for p in range(1, self.num_terms + 1):
+            x_terms[:, p - 1:p] = cond_x ** p
+        sampled_u = self.model.predict(x_terms).reshape(cond_x.shape)
+        if self.noise_type == "additive":
+            sampled_u += random_x
+        if self.noise_type == "multiplicative":
+            sampled_u = (1 + random_x) * sampled_u
+        return sampled_u.ravel()
 

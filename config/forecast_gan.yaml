@@ -7,7 +7,6 @@ random_updater_path: ./exp/ar1_random_updater.pkl
 num_steps: 200
 num_random: 8
 time_step: 0.005
-x_time_lag: 0
 random_seeds: [5000, 6000]
 initial_step: 100000
 lorenz_nc_file: ./exp/lorenz_output.nc
