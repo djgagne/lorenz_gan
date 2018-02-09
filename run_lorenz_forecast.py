@@ -10,6 +10,7 @@ import pickle
 import traceback
 from os.path import join
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", help="Path to config yaml file")
@@ -32,6 +33,7 @@ def main():
         random_seeds = config["random_seeds"]
     initial_step = config["initial_step"]
     out_path = config["out_path"]
+    x_only = config["x_only"]
     F = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
     x_initial = lorenz_output["lorenz_x"][initial_step].values
@@ -40,21 +42,21 @@ def main():
         for member in range(config["num_members"]):
             launch_forecast_member(member, np.copy(x_initial), u_initial, F, u_model_path, random_updater,
                                    num_steps, num_random, time_step,
-                                   random_seeds[member], out_path)
+                                   random_seeds[member], initial_step, x_only, out_path)
     else:
         pool = Pool(args.proc)
         for member in range(config["num_members"]):
             pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, F, u_model_path,
                                                       random_updater, num_steps,
                                                       num_random, time_step,
-                                                      random_seeds[member], out_path))
+                                                      random_seeds[member], initial_step, x_only, out_path))
         pool.close()
         pool.join()
     return
 
 
-def launch_forecast_member(member_number, x_initial, u_initial, F, u_model_path, random_updater, num_steps,
-                           num_random, time_step, random_seed, out_path):
+def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, random_updater, num_steps,
+                           num_random, time_step, random_seed, initial_step, x_only, out_path):
     try:
         if u_model_path[-2:] == "h5":
             u_model = SubModelGAN(u_model_path)
@@ -64,9 +66,11 @@ def launch_forecast_member(member_number, x_initial, u_initial, F, u_model_path,
         print("Starting member {0:d}".format(member_number))
         np.random.seed(random_seed)
         K.tf.set_random_seed(random_seed)
-        forecast_out = run_lorenz96_forecast(x_initial, u_initial, F, u_model, random_updater, num_steps, num_random,
-                                             time_step)
-        forecast_out.to_netcdf(join(out_path, "lorenz_forecast_{0:02d}.nc".format(member_number)),
+        forecast_out = run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps, num_random,
+                                             time_step, x_only=x_only)
+        forecast_out.attrs["initial_step"] = initial_step
+        forecast_out.attrs["member"] = member_number
+        forecast_out.to_netcdf(join(out_path, "lorenz_forecast_{0:07d}_{1:02d}.nc".format(initial_step, member_number)),
                                mode="w", encoding={"x": {"dtype": "float32", "zlib": True, "complevel": 2},
                                                    "u": {"dtype": "float32", "zlib": True, "complevel": 2}})
         #x_data = {"time": times, "step": steps}

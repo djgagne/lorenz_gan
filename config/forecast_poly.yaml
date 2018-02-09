@@ -10,5 +10,6 @@ time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 6000]
 initial_step: 100000
+x_only: 1
 lorenz_nc_file: ./exp/lorenz_output.nc
 out_path: ./exp_poly/

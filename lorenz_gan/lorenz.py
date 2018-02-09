@@ -104,7 +104,7 @@ def l96_forecast_step(X, F):
 
 
 def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps,
-                          num_random, time_step=0.005):
+                          num_random, time_step=0.005, x_only=True):
     """
     Integrate the Lorenz 96 forecast model forward in time from a specified initial state with
     a parameterized subgrid forcing model. The u_model should contain a predict method that
@@ -120,34 +120,54 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
         time_step (float): Size of the integration time step in MTUs
 
     Returns:
-        output:
+        output: xarray Dataset containing X and U values
     """
     steps = np.arange(num_steps)
     times = steps * time_step
-    X = np.zeros(x_initial.shape)
-    X[:] = x_initial[:]
+    x_u_curr = np.zeros((x_initial.shape[0], 2))
+    x_u_curr[:, 0] = x_initial[:]
+    x_u_curr[:, 1] = x_initial[:]
     coords = {"step": steps, "x_size": np.arange(x_initial.size)}
-    X_out = xr.DataArray(np.zeros((num_steps, X.size)),
+    X_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
                          coords=coords, dims=("step", "x_size"),
                          attrs={"long_name": "x values"})
-    U_out = xr.DataArray(np.zeros((num_steps, X.size)),
+    U_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
                          coords=coords, dims=("step", "x_size"),
                          attrs={"long_name": "u values"})
-    X_out[0] = X
+    X_out[0] = x_initial
     U_out[0] = u_initial
-    k1_dXdt = np.zeros(X.shape)
-    k2_dXdt = np.zeros(X.shape)
-    k3_dXdt = np.zeros(X.shape)
-    k4_dXdt = np.zeros(X.shape)
-    random_values = np.random.normal(size=(X.size, num_random))
+    k1_dXdt = np.zeros(x_initial.shape)
+    k2_dXdt = np.zeros(x_initial.shape)
+    k3_dXdt = np.zeros(x_initial.shape)
+    k4_dXdt = np.zeros(x_initial.shape)
+    random_values = np.random.normal(size=(x_initial.size, num_random))
     for n in range(1, num_steps):
-        U_out[n] = u_model.predict(X_out[n - 1: n].T, random_values)
-        k1_dXdt[:] = l96_forecast_step(X, f) - U_out[n]
-        k2_dXdt[:] = l96_forecast_step(X + k1_dXdt * 0.5 * time_step, f) - U_out[n]
-        k3_dXdt[:] = l96_forecast_step(X + k1_dXdt * 0.5 * time_step, f) - U_out[n]
-        k4_dXdt[:] = l96_forecast_step(X + k1_dXdt * time_step, f) - U_out[n]
-        X += (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
-        X_out[n] = X
+        if x_only:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+        else:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+        U_out[n] = x_u_curr[:, 1]
+        k1_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+        x_u_curr[:, 0] = X_out[n -1] + k1_dXdt * 0.5 * time_step
+        if x_only:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+        else:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+        k2_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+        x_u_curr[:, 0] = X_out[n -1] + k2_dXdt * 0.5 * time_step
+        if x_only:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+        else:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+        k3_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+        x_u_curr[:, 0] = X_out[n-1] + k3_dXdt[:] * time_step
+        if x_only:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+        else:
+            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+        k4_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+        x_u_curr[:, 0] = X_out[n-1] + (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
+        X_out[n] = x_u_curr[:, 0]
         random_values = random_updater.update(random_values)
     output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, time=times),
                         coords=coords)
