@@ -37,7 +37,9 @@ def main():
     F = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
     x_initial = lorenz_output["lorenz_x"][initial_step].values
-    u_initial = np.copy(x_initial)
+    y_initial = lorenz_output["lorenz_y"][initial_step].values
+    u_initial = y_initial.reshape(8, 32).sum(axis=1)
+
     if args.proc == 1:
         for member in range(config["num_members"]):
             launch_forecast_member(member, np.copy(x_initial), u_initial, F, u_model_path, random_updater,

@@ -23,7 +23,7 @@ gan:
         min_conv_filters: 8
         min_data_width: 8
         filter_width: 5
-        dropout_alpha: 0.2
+        dropout_alpha: 0.5
     discriminator:
         num_cond_inputs: 2
         num_sample_inputs: 32
@@ -36,7 +36,7 @@ gan:
     batch_size: 128
     gan_index: 0
     loss: binary_crossentropy
-    learning_rate: 0.001
+    learning_rate: 0.0002
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     metrics: ["accuracy"]
 random_updater:

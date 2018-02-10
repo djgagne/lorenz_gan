@@ -58,3 +58,8 @@ runs the GAN training. If you do not wish to train the GAN, which can take a few
 
 The program ```run_lorenz_forecast.py``` runs an ensemble of Lorenz forecast models with the parameterization specified
 in the config file. 
+```
+>>> python run_lorenz_forecast.py config/forecast_poly.yaml -p 3
+```
+The ```-p``` argument specifies the number of processors to be used for generating forecasts. Each forecast member in
+the ensemble is run in a separate process.

@@ -356,19 +356,19 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
     for epoch in range(1, max(num_epochs) + 1):
         np.random.shuffle(train_order)
         # Loop over all of the random training batches
-        for b, b_index in enumerate(np.arange(batch_half, train_sample_data.shape[0] + batch_half, batch_half)):
+        for b, b_index in enumerate(np.arange(batch_size, train_sample_data.shape[0], batch_size * 2)):
             batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
             gen_batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
-            gen_cond_data_batch[:] = generate_random_condition_data(batch_size, train_cond_data.shape[1],
-                                                                    train_cond_exp_scale)
-            combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_half: b_index]]
-            combo_cond_data_batch[:batch_half] = train_cond_data[train_order[b_index - batch_half: b_index]]
-            combo_cond_data_batch[batch_half:] = generate_random_condition_data(batch_half, train_cond_data.shape[1],
-                                                                                train_cond_exp_scale)
+
+            #gen_cond_data_batch[:] = generate_random_condition_data(batch_size, train_cond_data.shape[1],
+            #                                                        train_cond_exp_scale)
+            gen_cond_data_batch[:] = train_cond_data[train_order[b_index: b_index + batch_size]]
+            combo_cond_data_batch[:] = train_cond_data[train_order[b_index - batch_size: b_index]]
+            #combo_cond_data_batch[batch_half:] = generate_random_condition_data(batch_half, train_cond_data.shape[1],
+            #                                                                    train_cond_exp_scale)
+            combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_size: b_index - batch_half]]
             combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:, :, 0],
                                                            batch_vec[batch_half:], True])[0]
-            #combo_data_batch[batch_half:] = generator.predict_on_batch([combo_cond_data_batch[batch_half:, :, 0],
-            #                                                            batch_vec[batch_half:]])
             disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch[:, :, 0],
                                                                    combo_data_batch],
                                                                   batch_labels))
