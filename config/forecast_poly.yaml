@@ -1,15 +1,15 @@
-num_members: 40
+num_members: 10
 initial_x: []
 F: 30
 u_model_name: hist
-u_model_path: ./exp/u_poly.pkl
-random_updater_path: ./exp/ar1_random_updater.pkl
+u_model_path: ./exp_u/u_poly.pkl
+random_updater_path: ./exp_u/ar1_random_updater.pkl
 num_steps: 200
 num_random: 1
 time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 6000]
-initial_step: 100000
+initial_step: 1100000
 x_only: 1
-lorenz_nc_file: ./exp/lorenz_output.nc
+lorenz_nc_file: ./exp_u/lorenz_output.nc
 out_path: ./exp_poly/

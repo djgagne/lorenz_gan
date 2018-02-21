@@ -74,6 +74,8 @@ def main():
     if not exists(config["gan"]["gan_path"]):
         mkdir(config["gan"]["gan_path"])
     u_scale = config["lorenz"]["h"] * config["lorenz"]["c"] / config["lorenz"]["b"]
+    saved_steps = (config["lorenz"]["num_steps"] - config["lorenz"]["burn_in"]) // config["lorenz"]["skip"]
+    split_step = int(config["lorenz"]["train_test_split"] * saved_steps)
     if args.reload:
         print("Reloading csv data")
         combined_data = pd.read_csv(config["output_csv_file"])
@@ -81,12 +83,13 @@ def main():
         X_out = lorenz_output["lorenz_x"].values
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
-        combined_data = process_lorenz_data(X_out, Y_out, times, steps,
+        print(X_out.shape, Y_out.shape, saved_steps, split_step)
+        combined_data = process_lorenz_data(X_out[:split_step], Y_out[:split_step], times[:split_step],
+                                            steps[:split_step],
                                             config["lorenz"]["J"], config["gan"]["x_skip"],
                                             config["gan"]["t_skip"], u_scale)
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
-        print(combined_data)
     y_cols = combined_data.columns[combined_data.columns.str.contains("Y")]
     train_random_updater(X_out[:, 5], config["random_updater"]["out_file"])
     u_vals = u_scale * combined_data[y_cols].sum(axis=1).values
@@ -153,7 +156,7 @@ def train_lorenz_gan(config, combined_data):
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])
-    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5)
+    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.9)
     loss = config["gan"]["loss"]
     gen_disc = initialize_gan(gen_model, disc_model, loss, optimizer, config["gan"]["metrics"])
     if trim > 0:
@@ -166,6 +169,7 @@ def train_lorenz_gan(config, combined_data):
               config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"],
               Y_scaling_values, X_scaling_values)
+
 
 def train_random_updater(data, out_file):
     random_updater = AR1RandomUpdater()

@@ -51,9 +51,9 @@ def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
         X_out [number of timesteps, X size]: X values at each time step,
         Y_out [number of timesteps, Y size]: Y values at each time step
     """
-    X_out = np.zeros((num_steps + 1, X.size))
-    Y_out = np.zeros((num_steps + 1, Y.size))
-    steps = np.arange(num_steps + 1)
+    X_out = np.zeros((num_steps, X.size))
+    Y_out = np.zeros((num_steps, Y.size))
+    steps = np.arange(num_steps)
     times = steps * time_step
     X_out[0] = X
     Y_out[0] = Y
@@ -65,7 +65,7 @@ def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
     k2_dYdt = np.zeros(Y.shape)
     k3_dYdt = np.zeros(Y.shape)
     k4_dYdt = np.zeros(Y.shape)
-    for n in range(1, num_steps + 1):
+    for n in range(1, num_steps):
         print(n)
         k1_dXdt[:], k1_dYdt[:] = l96_truth_step(X, Y, h, F, b, c)
         k2_dXdt[:], k2_dYdt[:] = l96_truth_step(X + k1_dXdt * time_step / 2,
@@ -208,7 +208,6 @@ def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
     X_series = np.vstack(X_series_list)
     Y_series = np.vstack(Y_series_list)
     U_series = np.vstack(U_series_list)
-    print(X_series.shape, Y_series.shape, U_series.shape)
     x_cols = ["X_t"]
     y_cols = ["Y_{0:d}".format(y) for y in range(J)]
     u_col = "U_t"

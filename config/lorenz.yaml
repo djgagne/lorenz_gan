@@ -6,9 +6,11 @@ lorenz:
     c: 10.0
     F: 30.0
     time_step: 0.001
-    num_steps: 1000000
+    num_steps: 2000000
     skip: 5
     burn_in: 2000
+    train_test_split_step: 1000000
+
 gan:
     structure: conv
     t_skip: 10

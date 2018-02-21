@@ -32,26 +32,40 @@ def main():
     else:
         random_seeds = config["random_seeds"]
     initial_step = config["initial_step"]
+    if type(initial_step) == int:
+        initial_steps = np.array([initial_step], dtype=int)
+    else:
+        initial_steps = np.linspace(initial_step[0], initial_step[1], initial_step[2]).astype(int)
     out_path = config["out_path"]
     x_only = config["x_only"]
     F = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
-    x_initial = lorenz_output["lorenz_x"][initial_step].values
-    y_initial = lorenz_output["lorenz_y"][initial_step].values
-    u_initial = y_initial.reshape(8, 32).sum(axis=1)
-
+    step_values = lorenz_output["step"].values
     if args.proc == 1:
-        for member in range(config["num_members"]):
-            launch_forecast_member(member, np.copy(x_initial), u_initial, F, u_model_path, random_updater,
-                                   num_steps, num_random, time_step,
-                                   random_seeds[member], initial_step, x_only, out_path)
+        for step in initial_steps:
+            step_index = np.where(step_values == step)[0]
+            print(step_index)
+            x_initial = lorenz_output["lorenz_x"][step_index].values
+            y_initial = lorenz_output["lorenz_y"][step_index].values
+            u_initial = y_initial.reshape(8, 32).sum(axis=1)
+            for member in range(config["num_members"]):
+                launch_forecast_member(member, np.copy(x_initial), u_initial, F, u_model_path, random_updater,
+                                       num_steps, num_random, time_step,
+                                       random_seeds[member], initial_step, x_only, out_path)
     else:
         pool = Pool(args.proc)
-        for member in range(config["num_members"]):
-            pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, F, u_model_path,
-                                                      random_updater, num_steps,
-                                                      num_random, time_step,
-                                                      random_seeds[member], initial_step, x_only, out_path))
+        for step in initial_steps:
+            step_index = np.where(step_values == step)[0][0]
+            print(step_index)
+            x_initial = lorenz_output["lorenz_x"][step_index].values
+            y_initial = lorenz_output["lorenz_y"][step_index].values
+            u_initial = y_initial.reshape(8, 32).sum(axis=1)
+            print(x_initial, y_initial, u_initial)
+            for member in range(config["num_members"]):
+                pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, F, u_model_path,
+                                                          random_updater, num_steps,
+                                                          num_random, time_step,
+                                                          random_seeds[member], initial_step, x_only, out_path))
         pool.close()
         pool.join()
     return
@@ -60,6 +74,8 @@ def main():
 def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, random_updater, num_steps,
                            num_random, time_step, random_seed, initial_step, x_only, out_path):
     try:
+        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=2))
+        K.set_session(sess)
         if u_model_path[-2:] == "h5":
             u_model = SubModelGAN(u_model_path)
         else:
@@ -75,13 +91,6 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
         forecast_out.to_netcdf(join(out_path, "lorenz_forecast_{0:07d}_{1:02d}.nc".format(initial_step, member_number)),
                                mode="w", encoding={"x": {"dtype": "float32", "zlib": True, "complevel": 2},
                                                    "u": {"dtype": "float32", "zlib": True, "complevel": 2}})
-        #x_data = {"time": times, "step": steps}
-        #x_cols = []
-        #for i in range(x_out.shape[1]):
-        #    x_cols.append("X_{0:d}".format(i))
-        #    x_data[x_cols[-1]] = x_out[:, i]
-        #x_frame = pd.DataFrame(x_data, columns=["time", "step"] + x_cols)
-        #x_frame.to_csv(join(out_path, "lorenz_forecast_{0:02d}.csv".format(member_number)), index=False)
     except Exception as e:
         print(traceback.format_exc())
         raise e
