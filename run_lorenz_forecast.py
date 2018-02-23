@@ -38,7 +38,11 @@ def main():
         initial_steps = np.linspace(initial_step[0], initial_step[1], initial_step[2]).astype(int)
     out_path = config["out_path"]
     x_only = config["x_only"]
-    F = config["F"]
+    if "call_param_once" in config.keys():
+        call_param_once = config["call_param_once"]
+    else:
+        call_param_once = False
+    f = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
     step_values = lorenz_output["step"].values
     if args.proc == 1:
@@ -49,9 +53,9 @@ def main():
             y_initial = lorenz_output["lorenz_y"][step_index].values
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             for member in range(config["num_members"]):
-                launch_forecast_member(member, np.copy(x_initial), u_initial, F, u_model_path, random_updater,
+                launch_forecast_member(member, np.copy(x_initial), u_initial, f, u_model_path, random_updater,
                                        num_steps, num_random, time_step,
-                                       random_seeds[member], initial_step, x_only, out_path)
+                                       random_seeds[member], initial_step, x_only, call_param_once, out_path)
     else:
         pool = Pool(args.proc)
         for step in initial_steps:
@@ -62,17 +66,41 @@ def main():
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             print(x_initial, y_initial, u_initial)
             for member in range(config["num_members"]):
-                pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, F, u_model_path,
+                pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, f, u_model_path,
                                                           random_updater, num_steps,
                                                           num_random, time_step,
-                                                          random_seeds[member], initial_step, x_only, out_path))
+                                                          random_seeds[member], initial_step, x_only, call_param_once,
+                                                          out_path))
         pool.close()
         pool.join()
     return
 
 
 def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, random_updater, num_steps,
-                           num_random, time_step, random_seed, initial_step, x_only, out_path):
+                           num_random, time_step, random_seed, initial_step, x_only, call_param_once, out_path):
+    """
+    Run a single Lorenz 96 forecast model with a specified x and u initial conditions and forcing. The output
+    of the run is saved to a netCDF file.
+
+    Args:
+        member_number:
+        x_initial:
+        u_initial:
+        f:
+        u_model_path:
+        random_updater:
+        num_steps:
+        num_random:
+        time_step:
+        random_seed:
+        initial_step:
+        x_only:
+        call_param_once:
+        out_path:
+
+    Returns:
+
+    """
     try:
         sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=2))
         K.set_session(sess)
@@ -85,9 +113,10 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
         np.random.seed(random_seed)
         K.tf.set_random_seed(random_seed)
         forecast_out = run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps, num_random,
-                                             time_step, x_only=x_only)
+                                             time_step, x_only=x_only, call_param_once=call_param_once)
         forecast_out.attrs["initial_step"] = initial_step
         forecast_out.attrs["member"] = member_number
+        forecast_out.attrs["u_model_path"] = u_model_path
         forecast_out.to_netcdf(join(out_path, "lorenz_forecast_{0:07d}_{1:02d}.nc".format(initial_step, member_number)),
                                mode="w", encoding={"x": {"dtype": "float32", "zlib": True, "complevel": 2},
                                                    "u": {"dtype": "float32", "zlib": True, "complevel": 2}})

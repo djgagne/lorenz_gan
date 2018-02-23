@@ -22,12 +22,13 @@ class SubModelGAN(object):
         self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
     def predict_percentile(self, cond_x, random_x, num_samples=20):
+        norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
         output = np.zeros((cond_x.shape[0], num_samples))
         predictions = np.zeros((cond_x.shape[0],))
         percentiles = norm.cdf(random_x[:, 0]) * 100
         for s in range(num_samples):
-            output[:, s] = unnormalize_data(self.pred_func([cond_x, random_x, True])[0],
-                                       self.scaling_values)[:, :, 0].sum(axis=1)
+            output[:, s] = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
+                                            self.scaling_values)[:, :, 0].sum(axis=1)
         for p in range(predictions.size):
             predictions[p] = np.percentile(output[p], percentiles[p])
         return predictions
@@ -37,6 +38,7 @@ class SubModelGAN(object):
         predictions = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
                                        self.y_scaling_values)[:, :, 0].sum(axis=1)
         return predictions
+
 
 class SubModelHist(object):
     def __init__(self, num_x_bins=20, num_u_bins=20):
