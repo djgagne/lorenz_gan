@@ -1,6 +1,6 @@
 from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
 from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer, MaxPool1D
-from keras.initializers import RandomNormal
+from keras.initializers import RandomUniform
 import keras.backend as K
 from keras.optimizers import Adam
 import xarray as xr
@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 from os.path import join
 from keras.regularizers import l2
-
+from keras.engine import InputSpec
+from keras.layers import Dense, Lambda, Wrapper
 
 class Interpolate1D(Layer):
     def __init__(self, **kwargs):
@@ -38,6 +39,118 @@ class Interpolate1D(Layer):
         return output
 
 
+class ConcreteDropout(Wrapper):
+    """This wrapper allows to learn the dropout probability for any given input layer.
+    ```python
+        # as the first layer in a model
+        model = Sequential()
+        model.add(ConcreteDropout(Dense(8), input_shape=(16)))
+        # now model.output_shape == (None, 8)
+        # subsequent layers: no need for input_shape
+        model.add(ConcreteDropout(Dense(32)))
+        # now model.output_shape == (None, 32)
+    ```
+    `ConcreteDropout` can be used with arbitrary layers, not just `Dense`,
+    for instance with a `Conv2D` layer:
+    ```python
+        model = Sequential()
+        model.add(ConcreteDropout(Conv2D(64, (3, 3)),
+                                  input_shape=(299, 299, 3)))
+    ```
+    # Arguments
+        layer: a layer instance.
+        weight_regularizer:
+            A positive number which satisfies
+                $weight_regularizer = l**2 / (\tau * N)$
+            with prior lengthscale l, model precision $\tau$ (inverse observation noise),
+            and N the number of instances in the dataset.
+            Note that kernel_regularizer is not needed.
+        dropout_regularizer:
+            A positive number which satisfies
+                $dropout_regularizer = 2 / (\tau * N)$
+            with model precision $\tau$ (inverse observation noise) and N the number of
+            instances in the dataset.
+            Note the relation between dropout_regularizer and weight_regularizer:
+                $weight_regularizer / dropout_regularizer = l**2 / 2$
+            with prior lengthscale l. Note also that the factor of two should be
+            ignored for cross-entropy loss, and used only for the eculedian loss.
+    """
+
+    def __init__(self, layer, weight_regularizer=1e-6, dropout_regularizer=1e-5,
+                 init_min=0.1, init_max=0.1, is_mc_dropout=True, **kwargs):
+        assert 'kernel_regularizer' not in kwargs
+        super(ConcreteDropout, self).__init__(layer, **kwargs)
+        self.weight_regularizer = weight_regularizer
+        self.dropout_regularizer = dropout_regularizer
+        self.is_mc_dropout = is_mc_dropout
+        self.supports_masking = True
+        self.p_logit = None
+        self.p = None
+        self.init_min = np.log(init_min) - np.log(1. - init_min)
+        self.init_max = np.log(init_max) - np.log(1. - init_max)
+
+    def build(self, input_shape=None):
+        self.input_spec = InputSpec(shape=input_shape)
+        if not self.layer.built:
+            self.layer.build(input_shape)
+            self.layer.built = True
+        super(ConcreteDropout, self).build()  # this is very weird.. we must call super before we add new losses
+
+        # initialise p
+        self.p_logit = self.layer.add_weight(name='p_logit',
+                                            shape=(1,),
+                                            initializer=RandomUniform(self.init_min, self.init_max),
+                                            trainable=True)
+        self.p = K.sigmoid(self.p_logit[0])
+
+        # initialise regulariser / prior KL term
+        input_dim = np.prod(input_shape[1:])  # we drop only last dim
+        weight = self.layer.kernel
+        kernel_regularizer = self.weight_regularizer * K.sum(K.square(weight)) / (1. - self.p)
+        dropout_regularizer = self.p * K.log(self.p)
+        dropout_regularizer += (1. - self.p) * K.log(1. - self.p)
+        dropout_regularizer *= self.dropout_regularizer * input_dim
+        regularizer = K.sum(kernel_regularizer + dropout_regularizer)
+        self.layer.add_loss(regularizer)
+
+    def compute_output_shape(self, input_shape):
+        return self.layer.compute_output_shape(input_shape)
+
+    def concrete_dropout(self, x):
+        '''
+        Concrete dropout - used at training time (gradients can be propagated)
+        :param x: input
+        :return:  approx. dropped out input
+        '''
+        eps = K.cast_to_floatx(K.epsilon())
+        temp = 0.1
+
+        unif_noise = K.random_uniform(shape=K.shape(x))
+        drop_prob = (
+            K.log(self.p + eps)
+            - K.log(1. - self.p + eps)
+            + K.log(unif_noise + eps)
+            - K.log(1. - unif_noise + eps)
+        )
+        drop_prob = K.sigmoid(drop_prob / temp)
+        random_tensor = 1. - drop_prob
+
+        retain_prob = 1. - self.p
+        x *= random_tensor
+        x /= retain_prob
+        return x
+
+    def call(self, inputs, training=None):
+        if self.is_mc_dropout:
+            return self.layer.call(self.concrete_dropout(inputs))
+        else:
+            def relaxed_dropped_inputs():
+                return self.layer.call(self.concrete_dropout(inputs))
+            return K.in_train_phase(relaxed_dropped_inputs,
+                                    self.layer.call(inputs),
+                                    training=training)
+
+
 def predict_stochastic(neural_net):
     """
     Have the neural network make predictions with the Dropout layers on, resulting in stochastic behavior from the
@@ -54,6 +167,67 @@ def predict_stochastic(neural_net):
     output = neural_net.output
     pred_func = K.function(input + [K.learning_phase()], [output])
     return pred_func
+
+
+def generator_conv_concrete(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
+                   activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3,
+                   dropout_alpha=0.2, data_size=1.0e5):
+    """
+    Convolutional conditional generator neural network. The conditional generator takes a combined vector of
+    normalized conditional and random values and outputs normalized synthetic examples of the training data.
+    This function creates the network architecture. The network design assumes that the number of convolution
+    filters halves with each convolutional layer.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_random_inputs (int): Size of the random input vector.
+        num_outputs (int): Size of the output vector. Recommend using a power of 2 for easy scaling.
+        activation (str): Type of activation function for the convolutional layers. Recommend selu, elu, or relu.
+        min_conv_filters (int): Number of convolutional filters at the second to last convolutional layer
+        min_data_width (int): Width of the first convolutional layer after the dense layer. Should be a power
+            of 2.
+        filter_width (int): Width of the convolutional filters
+    Returns:
+        generator: Keras Model object of the generator network
+    """
+    l = 1e-4
+    wd = l ** 2. / data_size
+    dd = 2. / data_size
+    num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
+    max_conv_filters = int(min_conv_filters * 2 ** (num_layers))
+    curr_conv_filters = max_conv_filters
+    gen_cond_input = Input(shape=(num_cond_inputs, ))
+    gen_cond_repeat = RepeatVector(min_data_width)(gen_cond_input)
+    gen_rand_input = Input(shape=(num_random_inputs, ))
+    gen_model = Reshape((num_random_inputs, 1))(gen_rand_input)
+    gen_model = ConcreteDropout(Conv1D(max_conv_filters, filter_width, padding="same",
+                                       kernel_regularizer=l2()),
+                                weight_regularizer=wd, dropout_regularizer=dd)(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
+    gen_model = concatenate([gen_model, gen_cond_repeat])
+    data_width = min_data_width
+    for i in range(0, num_layers):
+        curr_conv_filters //= 2
+        if data_width < filter_width:
+            f_width = 3
+        else:
+            f_width = filter_width
+        gen_model = ConcreteDropout(Conv1D(curr_conv_filters, f_width,
+                                           padding="same", kernel_regularizer=l2()),
+                                    weight_regularizer=wd, dropout_regularizer=dd)(gen_model)
+        if activation == "leaky":
+            gen_model = LeakyReLU(0.2)(gen_model)
+        else:
+            gen_model = Activation(activation)(gen_model)
+        gen_model = Interpolate1D()(gen_model)
+        data_width *= 2
+    gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+    #gen_model = BatchNormalization()(gen_model)
+    generator = Model([gen_cond_input, gen_rand_input], gen_model)
+    return generator
 
 
 def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
@@ -115,6 +289,64 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     return generator
 
 
+def discriminator_conv_concrete(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
+                       min_conv_filters=8, min_data_width=4,
+                       filter_width=3, dropout_alpha=0.5, data_size=1.0e5):
+    """
+    Convolutional conditional discriminator neural network architecture. The conditional discriminator takes the
+    conditional vector and a real or synthetic sample and predicts the probability that the sample is real or not.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_sample_inputs (int): Size of the sample input vector
+        activation (str): Activation Function for convolutional layers. Recommend selu, elu, or relu.
+        min_conv_filters (int): Number of convolution filters in the first convolution layer. Doubles with
+            each subsequent layer
+        min_data_width (int): Width of the convolutional data after the last convolutional layer. Assumes halving
+            from the initial vector
+        filter_width (int): Width of the convolutional feature maps
+
+    Returns:
+        Discrminator Keras Model object
+    """
+    l = 1e-4
+    wd = l ** 2. / data_size
+    dd = 2. / data_size
+    disc_cond_input = Input(shape=(num_cond_inputs, ))
+    disc_cond_input_repeat = RepeatVector(num_sample_inputs)(disc_cond_input)
+    disc_sample_input = Input(shape=(num_sample_inputs, 1))
+    disc_model = concatenate([disc_sample_input, disc_cond_input_repeat])
+    num_layers = int(np.log2(num_sample_inputs) - np.log2(min_data_width))
+    curr_conv_filters = min_conv_filters
+    for i in range(num_layers):
+        disc_model = ConcreteDropout(Conv1D(curr_conv_filters, filter_width,
+                                            strides=1, padding="same", kernel_regularizer=l2()),
+                                     weight_regularizer=wd, dropout_regularizer=dd)(disc_model)
+        if activation == "leaky":
+            disc_model = LeakyReLU(0.2)(disc_model)
+        else:
+            disc_model = Activation(activation)(disc_model)
+        #if i > 0:
+        #isc_model = BatchNormalization()(disc_model)
+        disc_model = MaxPool1D()(disc_model)
+        curr_conv_filters *= 2
+    disc_model = ConcreteDropout(Conv1D(curr_conv_filters, filter_width,
+                                        padding="same", kernel_regularizer=l2()),
+                                 weight_regularizer=wd, dropout_regularizer=dd)(disc_model)
+    if activation == "leaky":
+        disc_model = LeakyReLU(0.2)(disc_model)
+    else:
+        disc_model = Activation(activation)(disc_model)
+    #disc_model = BatchNormalization()(disc_model)
+    disc_model = Flatten()(disc_model)
+    #disc_model = Dropout(dropout_alpha)(disc_model)
+
+    disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
+    disc_model = Activation("sigmoid")(disc_model)
+    discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
+    return discriminator
+
+
 def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
                        min_conv_filters=8, min_data_width=4,
                        filter_width=3, dropout_alpha=0.5):
@@ -150,17 +382,17 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
             disc_model = Activation(activation)(disc_model)
         #if i > 0:
         #    disc_model = BatchNormalization()(disc_model)
-        disc_model = MaxPool1D()(disc_model)
         disc_model = Dropout(dropout_alpha)(disc_model)
+        disc_model = MaxPool1D()(disc_model)
         curr_conv_filters *= 2
     disc_model = Conv1D(curr_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(disc_model)
     if activation == "leaky":
         disc_model = LeakyReLU(0.2)(disc_model)
     else:
         disc_model = Activation(activation)(disc_model)
+   #disc_model = Dropout(dropout_alpha)(disc_model)
     #disc_model = BatchNormalization()(disc_model)
     disc_model = Flatten()(disc_model)
-    disc_model = Dropout(dropout_alpha)(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)

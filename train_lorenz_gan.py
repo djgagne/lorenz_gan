@@ -1,6 +1,6 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
-from lorenz_gan.gan import train_gan, initialize_gan, normalize_data
+from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly
 import xarray as xr
 from keras.optimizers import Adam
@@ -156,7 +156,7 @@ def train_lorenz_gan(config, combined_data):
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])
-    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.9)
+    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5)
     loss = config["gan"]["loss"]
     gen_disc = initialize_gan(gen_model, disc_model, loss, optimizer, config["gan"]["metrics"])
     if trim > 0:

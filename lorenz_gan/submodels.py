@@ -4,7 +4,7 @@ import numpy as np
 from os.path import join
 import pandas as pd
 from scipy.stats import rv_histogram, norm
-from lorenz_gan.gan import Interpolate1D, unnormalize_data
+from lorenz_gan.gan import Interpolate1D, unnormalize_data, normalize_data, ConcreteDropout
 from sklearn.linear_model import LinearRegression
 
 
@@ -13,16 +13,30 @@ class SubModelGAN(object):
         self.model_path = model_path
         self.model_path_start = "/".join(model_path.split("/")[:-1])
         self.model_config = model_path.split("/")[-1].split("_")[2]
-        self.model = load_model(self.model_path, custom_objects={"Interpolate1D": Interpolate1D})
+        self.model = load_model(self.model_path, custom_objects={"Interpolate1D": Interpolate1D,
+                                                                 "ConcreteDropout": ConcreteDropout})
         self.pred_func = K.function(self.model.input + [K.learning_phase()], [self.model.output])
-        self.scaling_file = join(self.model_path_start, "gan_Y_scaling_values_{0}.csv".format(self.model_config))
-        self.scaling_values = pd.read_csv(self.scaling_file, index_col="Channel")
+        self.x_scaling_file = join(self.model_path_start, "gan_X_scaling_values_{0}.csv".format(self.model_config))
+        self.y_scaling_file = join(self.model_path_start, "gan_Y_scaling_values_{0}.csv".format(self.model_config))
+        self.y_scaling_values = pd.read_csv(self.y_scaling_file, index_col="Channel")
+        self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
-    def predict(self, cond_x, random_x):
-        predictions = unnormalize_data(self.pred_func([cond_x, random_x, True])[0],
+    def predict_percentile(self, cond_x, random_x, num_samples=20):
+        output = np.zeros((cond_x.shape[0], num_samples))
+        predictions = np.zeros((cond_x.shape[0],))
+        percentiles = norm.cdf(random_x[:, 0]) * 100
+        for s in range(num_samples):
+            output[:, s] = unnormalize_data(self.pred_func([cond_x, random_x, True])[0],
                                        self.scaling_values)[:, :, 0].sum(axis=1)
+        for p in range(predictions.size):
+            predictions[p] = np.percentile(output[p], percentiles[p])
         return predictions
 
+    def predict(self, cond_x, random_x):
+        norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
+        predictions = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
+                                       self.y_scaling_values)[:, :, 0].sum(axis=1)
+        return predictions
 
 class SubModelHist(object):
     def __init__(self, num_x_bins=20, num_u_bins=20):

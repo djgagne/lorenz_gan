@@ -122,11 +122,13 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     Returns:
         output: xarray Dataset containing X and U values
     """
+    order = 4
+    time_inc = np.array([0.5, 0.5, 1])
     steps = np.arange(num_steps)
     times = steps * time_step
-    x_u_curr = np.zeros((x_initial.shape[0], 2))
-    x_u_curr[:, 0] = x_initial[:]
-    x_u_curr[:, 1] = x_initial[:]
+    x_u_curr = np.zeros((2, x_initial.shape[0]))
+    x_u_curr[0] = x_initial[:]
+    x_u_curr[1] = u_initial[:]
     coords = {"step": steps, "x_size": np.arange(x_initial.size)}
     X_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
                          coords=coords, dims=("step", "x_size"),
@@ -140,35 +142,54 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     k2_dXdt = np.zeros(x_initial.shape)
     k3_dXdt = np.zeros(x_initial.shape)
     k4_dXdt = np.zeros(x_initial.shape)
+    k_dXdt = np.zeros((order, x_initial.shape[0]))
     random_values = np.random.normal(size=(x_initial.size, num_random))
     for n in range(1, num_steps):
-        if x_only:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
-        else:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
-        U_out[n] = x_u_curr[:, 1]
-        k1_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
-        x_u_curr[:, 0] = X_out[n -1] + k1_dXdt * 0.5 * time_step
-        if x_only:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
-        else:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
-        k2_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
-        x_u_curr[:, 0] = X_out[n -1] + k2_dXdt * 0.5 * time_step
-        if x_only:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
-        else:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
-        k3_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
-        x_u_curr[:, 0] = X_out[n-1] + k3_dXdt[:] * time_step
-        if x_only:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
-        else:
-            x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
-        k4_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
-        x_u_curr[:, 0] = X_out[n-1] + (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
-        X_out[n] = x_u_curr[:, 0]
+        if n % 10 == 0:
+            print(n)
+        for o in range(order):
+            if x_only:
+                x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
+            else:
+                x_u_curr[1] = u_model.predict(x_u_curr.T, random_values)
+            if o == 0:
+                U_out[n] = x_u_curr[1]
+            k_dXdt[o] = l96_forecast_step(x_u_curr[0], f) - x_u_curr[1]
+            if o < order - 1:
+                x_u_curr[0] = X_out[n - 1] + k_dXdt[o] * time_inc[o] * time_step
+        x_u_curr[0] = X_out[n - 1] + (k_dXdt[0] + 2 * k_dXdt[1] + 2 * k_dXdt[2] + k_dXdt[3]) / 6 * time_step
+        X_out[n] = x_u_curr[0]
         random_values = random_updater.update(random_values)
+    # for n in range(1, num_steps):
+    #     if n % 10 == 0:
+    #         print(n)
+    #     if x_only:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+    #     else:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+    #     U_out[n] = x_u_curr[:, 1]
+    #     k1_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+    #     x_u_curr[:, 0] = X_out[n -1] + k1_dXdt * 0.5 * time_step
+    #     if x_only:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+    #     else:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+    #     k2_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+    #     x_u_curr[:, 0] = X_out[n -1] + k2_dXdt * 0.5 * time_step
+    #     if x_only:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+    #     else:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+    #     k3_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+    #     x_u_curr[:, 0] = X_out[n-1] + k3_dXdt[:] * time_step
+    #     if x_only:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr[:, 0:1], random_values)
+    #     else:
+    #         x_u_curr[:, 1] = u_model.predict(x_u_curr, random_values)
+    #     k4_dXdt[:] = l96_forecast_step(x_u_curr[:, 0], f) - x_u_curr[:, 1]
+    #    x_u_curr[:, 0] = X_out[n-1] + (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
+    #    X_out[n] = x_u_curr[:, 0]
+    #    random_values = random_updater.update(random_values)
     output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, time=times),
                         coords=coords)
     return output
