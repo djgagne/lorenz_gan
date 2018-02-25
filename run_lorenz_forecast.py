@@ -102,7 +102,8 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
 
     """
     try:
-        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=2))
+        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=1,
+                                                    inter_op_parallelism_threads=1))
         K.set_session(sess)
         if u_model_path[-2:] == "h5":
             u_model = SubModelGAN(u_model_path)

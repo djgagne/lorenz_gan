@@ -1,0 +1,55 @@
+lorenz:
+    K: 8
+    J: 32
+    h: 1
+    b: 10.0
+    c: 10.0
+    F: 30.0
+    time_step: 0.001
+    num_steps: 20000000
+    skip: 5
+    burn_in: 2000
+    train_test_split: 0.1
+gan:
+    structure: conv
+    t_skip: 10
+    x_skip: 1
+    output: sample
+    cond_inputs: ["X_t", "U_t"]
+    generator:
+        num_cond_inputs: 2
+        num_random_inputs: 8
+        num_outputs: 32
+        activation: leaky
+        min_conv_filters: 8
+        min_data_width: 8
+        filter_width: 5
+        dropout_alpha: 0.4
+    discriminator:
+        num_cond_inputs: 2
+        num_sample_inputs: 32
+        activation: leaky
+        min_conv_filters: 8
+        min_data_width: 8
+        filter_width: 5
+        dropout_alpha: 0.05
+    gan_path: /glade/p/work/dgagne/exp_u/
+    batch_size: 128
+    gan_index: 0
+    loss: binary_crossentropy
+    learning_rate: 0.0002
+    num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    metrics: ["accuracy"]
+random_updater:
+    out_file: /glade/p/work/dgagne/exp_u/ar1_random_updater.pkl
+histogram:
+    num_x_bins: 30
+    num_u_bins: 30
+    out_file: /glade/p/work/dgagne/exp_u/u_histogram.pkl
+poly:
+    num_terms: 3
+    noise_type: additive
+    out_file: /glade/p/work/dgagne/exp_u/u_poly.pkl
+output_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
+output_csv_file: /glade/p/work/dgagne/exp_u/lorenz_combined_output.csv
+num_procs: 36

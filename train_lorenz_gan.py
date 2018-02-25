@@ -3,6 +3,7 @@ from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, 
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly
 import xarray as xr
+import keras.backend as K
 from keras.optimizers import Adam
 import numpy as np
 import pickle
@@ -134,6 +135,13 @@ def train_lorenz_gan(config, combined_data):
     Returns:
 
     """
+    if "num_procs" in config.keys():
+        num_procs = config["num_procs"]
+    else:
+        num_procs = 1
+    sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_procs,
+                                                inter_op_parallelism_threads=1))
+    K.set_session(sess)
     x_cols = config["gan"]["cond_inputs"]
     X_series = np.expand_dims(combined_data[x_cols].values, axis=-1)
     Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
