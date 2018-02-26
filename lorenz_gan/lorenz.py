@@ -33,55 +33,69 @@ def l96_truth_step(X, Y, h, F, b, c):
 
 
 @jit(nopython=True, cache=True)
-def run_lorenz96_truth(X, Y, h, F, b, c, time_step, num_steps):
+def run_lorenz96_truth(x_initial, y_initial, h, f, b, c, time_step, num_steps, burn_in, skip):
     """
     Integrate the Lorenz '96 "truth" model forward by num_steps.
 
     Args:
-        X (1D ndarray): Initial X values.
-        Y (1D ndarray): Initial Y values.
+        x_initial (1D ndarray): Initial X values.
+        y_initial (1D ndarray): Initial Y values.
         h (float): Coupling constant.
-        F (float): Forcing term.
+        f (float): Forcing term.
         b (float): Spatial scale ratio
         c (float): Time scale ratio
         time_step (float): Size of the integration time step in MTU
         num_steps (int): Number of time steps integrated forward.
+        burn_in (int): Number of time steps not saved at beginning
+        skip (int): Number of time steps skipped between archival
 
     Returns:
         X_out [number of timesteps, X size]: X values at each time step,
         Y_out [number of timesteps, Y size]: Y values at each time step
     """
-    X_out = np.zeros((num_steps, X.size))
-    Y_out = np.zeros((num_steps, Y.size))
-    steps = np.arange(num_steps)
+    archive_steps = (num_steps - burn_in) // skip
+    print(archive_steps)
+    x_out = np.zeros((archive_steps, x_initial.size))
+    y_out = np.zeros((archive_steps, y_initial.size))
+    steps = np.arange(num_steps)[burn_in::skip]
     times = steps * time_step
-    X_out[0] = X
-    Y_out[0] = Y
-    k1_dXdt = np.zeros(X.shape)
-    k2_dXdt = np.zeros(X.shape)
-    k3_dXdt = np.zeros(X.shape)
-    k4_dXdt = np.zeros(X.shape)
-    k1_dYdt = np.zeros(Y.shape)
-    k2_dYdt = np.zeros(Y.shape)
-    k3_dYdt = np.zeros(Y.shape)
-    k4_dYdt = np.zeros(Y.shape)
+    x = np.zeros(x_initial.shape)
+    y = np.zeros(y_initial.shape)
+    x[:] = x_initial
+    y[:] = y_initial
+    k1_dxdt = np.zeros(x.shape)
+    k2_dxdt = np.zeros(x.shape)
+    k3_dxdt = np.zeros(x.shape)
+    k4_dxdt = np.zeros(x.shape)
+    k1_dydt = np.zeros(y.shape)
+    k2_dydt = np.zeros(y.shape)
+    k3_dydt = np.zeros(y.shape)
+    k4_dydt = np.zeros(y.shape)
+    i = 0
+    if burn_in == 0:
+        x_out[i] = x
+        y_out[i] = y
+        i += 1
     for n in range(1, num_steps):
-        print(n)
-        k1_dXdt[:], k1_dYdt[:] = l96_truth_step(X, Y, h, F, b, c)
-        k2_dXdt[:], k2_dYdt[:] = l96_truth_step(X + k1_dXdt * time_step / 2,
-                                                Y + k1_dYdt * time_step / 2,
-                                                h, F, b, c)
-        k3_dXdt[:], k3_dYdt[:] = l96_truth_step(X + k2_dXdt * time_step / 2,
-                                                Y + k2_dYdt * time_step / 2,
-                                                h, F, b, c)
-        k4_dXdt[:], k4_dYdt[:] = l96_truth_step(X + k3_dXdt * time_step,
-                                                Y + k3_dYdt * time_step,
-                                                h, F, b, c)
-        X += (k1_dXdt + 2 * k2_dXdt + 2 * k3_dXdt + k4_dXdt) / 6 * time_step
-        Y += (k1_dYdt + 2 * k2_dYdt + 2 * k3_dYdt + k4_dYdt) / 6 * time_step
-        X_out[n] = X
-        Y_out[n] = Y
-    return X_out, Y_out, times, steps
+        if (n * time_step) % 1 == 0:
+            print(n, n * time_step)
+        k1_dxdt[:], k1_dydt[:] = l96_truth_step(x, y, h, f, b, c)
+        k2_dxdt[:], k2_dydt[:] = l96_truth_step(x + k1_dxdt * time_step / 2,
+                                                y + k1_dydt * time_step / 2,
+                                                h, f, b, c)
+        k3_dxdt[:], k3_dydt[:] = l96_truth_step(x + k2_dxdt * time_step / 2,
+                                                y + k2_dydt * time_step / 2,
+                                                h, f, b, c)
+        k4_dxdt[:], k4_dydt[:] = l96_truth_step(x + k3_dxdt * time_step,
+                                                y + k3_dydt * time_step,
+                                                h, f, b, c)
+        x += (k1_dxdt + 2 * k2_dxdt + 2 * k3_dxdt + k4_dxdt) / 6 * time_step
+        y += (k1_dydt + 2 * k2_dydt + 2 * k3_dydt + k4_dydt) / 6 * time_step
+        if n >= burn_in and n % skip == 0:
+            x_out[i] = x
+            y_out[i] = y
+            i += 1
+    return x_out, y_out, times, steps
 
 
 @jit(nopython=True, cache=True)

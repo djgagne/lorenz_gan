@@ -112,16 +112,16 @@ def generate_lorenz_data(config):
     Returns:
 
     """
-    X = np.zeros(config["K"], dtype=np.float32)
+    x = np.zeros(config["K"], dtype=np.float32)
     # initialize Y array
-    Y = np.zeros(config["J"] * config["K"], dtype=np.float32)
-    X[0] = 1
-    Y[0] = 1
+    y = np.zeros(config["J"] * config["K"], dtype=np.float32)
+    x[0] = 1
+    y[0] = 1
     skip = config["skip"]
-    X_out, Y_out, times, steps = run_lorenz96_truth(X, Y, config["h"], config["F"], config["b"],
-                                                    config["c"], config["time_step"], config["num_steps"])
-    return (X_out[config['burn_in']::skip], Y_out[config["burn_in"]::skip],
-            times[config["burn_in"]::skip], steps[config["burn_in"]::skip])
+    x_out, y_out, times, steps = run_lorenz96_truth(x, y, config["h"], config["F"], config["b"],
+                                                    config["c"], config["time_step"], config["num_steps"],
+                                                    config["burn_in"], skip)
+    return (x_out, y_out, times, steps)
 
 
 def train_lorenz_gan(config, combined_data):
