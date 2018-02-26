@@ -54,7 +54,6 @@ def run_lorenz96_truth(x_initial, y_initial, h, f, b, c, time_step, num_steps, b
         Y_out [number of timesteps, Y size]: Y values at each time step
     """
     archive_steps = (num_steps - burn_in) // skip
-    print(archive_steps)
     x_out = np.zeros((archive_steps, x_initial.size))
     y_out = np.zeros((archive_steps, y_initial.size))
     steps = np.arange(num_steps)[burn_in::skip]

@@ -9,6 +9,7 @@ from multiprocessing import Pool
 import pickle
 import traceback
 from os.path import join, exists
+import os
 
 
 def main():
@@ -48,8 +49,10 @@ def main():
     step_values = lorenz_output["step"].values
     if args.proc == 1:
         for step in initial_steps:
-            step_index = np.where(step_values == step)[0]
-            print(step_index)
+            step_index = np.where(step_values == step)[0][0]
+            step_dir = join(out_path, "{0:08d}".format(step))
+            if not exists(step_dir):
+                os.mkdir(step_dir)
             x_initial = lorenz_output["lorenz_x"][step_index].values
             y_initial = lorenz_output["lorenz_y"][step_index].values
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
@@ -129,6 +132,7 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
         del u_model
         if sess is not None:
             sess.close()
+            del sess
     except Exception as e:
         print(traceback.format_exc())
         raise e
