@@ -11,4 +11,4 @@ random_seeds: [5000, 5500]
 initial_step: 2000000
 x_only: 0
 lorenz_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
-out_path: /glade/p/work/dgagne/exp_u/gan_climate/
+out_path: /glade/scratch/dgagne/exp_u/gan_climate/
