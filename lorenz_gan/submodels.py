@@ -28,7 +28,7 @@ class SubModelGAN(object):
         percentiles = norm.cdf(random_x[:, 0]) * 100
         for s in range(num_samples):
             output[:, s] = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
-                                            self.scaling_values)[:, :, 0].sum(axis=1)
+                                            self.y_scaling_values)[:, :, 0].sum(axis=1)
         for p in range(predictions.size):
             predictions[p] = np.percentile(output[p], percentiles[p])
         return predictions
@@ -46,12 +46,12 @@ class SubModelHist(object):
         self.num_u_bins = num_u_bins
         self.x_bins = None
         self.u_bins = None
-        self.histogram = None
+        self.model = None
 
     def fit(self, cond_x, u):
         x_bins = np.linspace(cond_x.min(), cond_x.max(), self.num_x_bins)
         u_bins = np.linspace(cond_x.min(), cond_x.max(), self.num_u_bins)
-        self.histogram, self.x_bins, self.u_bins = np.histogram2d(cond_x, u, bins=(x_bins, u_bins))
+        self.model, self.x_bins, self.u_bins = np.histogram2d(cond_x, u, bins=(x_bins, u_bins))
 
     def predict(self, cond_x, random_x):
         cond_x_filtered = np.where(cond_x > self.x_bins.max(), self.x_bins.max(), cond_x)
@@ -60,7 +60,7 @@ class SubModelHist(object):
         sampled_u = np.zeros(cond_x.shape)
         for c, cond_x_val in enumerate(cond_x_filtered):
             x_bin = np.searchsorted(self.x_bins, cond_x_val)
-            sampled_u[c] = rv_histogram((self.histogram[:, x_bin[0]], self.u_bins)).ppf(random_percentile[c])
+            sampled_u[c] = rv_histogram((self.model[:, x_bin[0]], self.u_bins)).ppf(random_percentile[c])
         return sampled_u.ravel()
 
 

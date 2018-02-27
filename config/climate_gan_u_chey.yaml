@@ -1,4 +1,4 @@
-num_members: 5
+num_members: 1
 initial_x: []
 F: 30
 u_model_name: gan
@@ -12,3 +12,4 @@ initial_step: 2000000
 x_only: 0
 lorenz_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
 out_path: /glade/scratch/dgagne/exp_u/gan_climate/
+num_tf_threads: 36
