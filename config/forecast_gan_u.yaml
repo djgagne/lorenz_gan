@@ -9,7 +9,7 @@ num_random: 8
 time_step: 0.005
 random_seeds: [5000, 6000]
 initial_step: [1100000, 1500000, 100000]
-x_only: False
-call_param_once: True
+x_only: 0
+call_param_once: 1
 lorenz_nc_file: ./exp_u/lorenz_output.nc
 out_path: ./exp_u/

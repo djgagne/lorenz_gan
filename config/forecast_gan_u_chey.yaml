@@ -9,7 +9,7 @@ num_random: 8
 time_step: 0.005
 random_seeds: [5000, 15000]
 initial_step: [3000000, 18000000, 20000]
-x_only: False
-call_param_once: True
+x_only: 0
+call_param_once: 1
 lorenz_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
 out_path: /glade/scratch/dgagne/exp_u/gan_weather/

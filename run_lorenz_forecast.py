@@ -38,9 +38,9 @@ def main():
         initial_steps = np.arange(initial_step[0], initial_step[1] + initial_step[2], initial_step[2]).astype(int)
     print("Initial steps", initial_steps, initial_steps.size)
     out_path = config["out_path"]
-    x_only = config["x_only"]
+    x_only = bool(config["x_only"])
     if "call_param_once" in config.keys():
-        call_param_once = config["call_param_once"]
+        call_param_once = bool(config["call_param_once"])
     else:
         call_param_once = False
     f = config["F"]
@@ -68,9 +68,6 @@ def main():
         pool = Pool(args.proc, maxtasksperchild=10)
         for step in initial_steps:
             step_index = np.where(step_values == step)[0][0]
-            step_dir = join(out_path, "{0:08d}".format(step))
-            if not exists(step_dir):
-                os.mkdir(step_dir)
             x_initial = lorenz_output["lorenz_x"][step_index].values
             y_initial = lorenz_output["lorenz_y"][step_index].values
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
@@ -86,6 +83,9 @@ def main():
 def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_updater_path, num_steps,
                          num_random, time_step, random_seeds, initial_step_value, x_only, call_param_once, out_path,
                          num_tf_threads):
+    step_dir = join(out_path, "{0:08d}".format(initial_step_value))
+    if not exists(step_dir):
+        os.mkdir(step_dir)
     with open(random_updater_path, "rb") as random_updater_file:
         random_updater = pickle.load(random_updater_file)
     if u_model_path[-2:] == "h5":

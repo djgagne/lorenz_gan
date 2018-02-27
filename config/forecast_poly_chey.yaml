@@ -11,7 +11,7 @@ x_time_lag: 0
 random_seeds: [5000, 15000]
 initial_step: [3000000, 18000000, 20000]
 x_only: 1
-call_param_once: True
+call_param_once: 1
 lorenz_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
 out_path: /glade/scratch/dgagne/exp_u/poly_weather/
 
