@@ -10,7 +10,7 @@ import pickle
 import traceback
 from os.path import join, exists
 import os
-
+from time import sleep
 
 def main():
     parser = argparse.ArgumentParser()
@@ -21,8 +21,7 @@ def main():
     with open(config_file) as config_obj:
         config = yaml.load(config_obj)
     u_model_path = config["u_model_path"]
-    with open(config["random_updater_path"], "rb") as random_updater_file:
-        random_updater = pickle.load(random_updater_file)
+    random_updater_path = config["random_updater_path"]
     num_steps = config["num_steps"]
     num_random = config["num_random"]
     time_step = config["time_step"]
@@ -57,11 +56,11 @@ def main():
             y_initial = lorenz_output["lorenz_y"][step_index].values
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             for member in range(config["num_members"]):
-                launch_forecast_member(member, np.copy(x_initial), u_initial, f, u_model_path, random_updater,
+                launch_forecast_member(member, np.copy(x_initial), u_initial, f, u_model_path, random_updater_path,
                                        num_steps, num_random, time_step,
                                        random_seeds[member], step, x_only, call_param_once, out_path)
     else:
-        pool = Pool(args.proc, maxtasksperchild=1)
+        pool = Pool(args.proc)
         for step in initial_steps:
             step_index = np.where(step_values == step)[0][0]
             step_dir = join(out_path, "{0:08d}".format(step))
@@ -72,16 +71,17 @@ def main():
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             for member in range(config["num_members"]):
                 pool.apply_async(launch_forecast_member, (member, np.copy(x_initial), u_initial, f, u_model_path,
-                                                          random_updater, num_steps,
+                                                          random_updater_path, num_steps,
                                                           num_random, time_step,
                                                           random_seeds[member], step, x_only, call_param_once,
                                                           out_path))
+            sleep(100)
         pool.close()
         pool.join()
     return
 
 
-def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, random_updater, num_steps,
+def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, random_updater_path, num_steps,
                            num_random, time_step, random_seed, initial_step_value, x_only, call_param_once, out_path):
     """
     Run a single Lorenz 96 forecast model with a specified x and u initial conditions and forcing. The output
@@ -93,7 +93,7 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
         u_initial:
         f:
         u_model_path:
-        random_updater:
+        random_updater_path:
         num_steps:
         num_random:
         time_step:
@@ -109,6 +109,8 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
     try:
         sess = None
         np.random.seed(random_seed)
+        with open(random_updater_path, "rb") as random_updater_file:
+            random_updater = pickle.load(random_updater_file)
         if u_model_path[-2:] == "h5":
             sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=1,
                                                     inter_op_parallelism_threads=1))
@@ -130,6 +132,7 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
                                                    "u": {"dtype": "float32", "zlib": True, "complevel": 2}})
         del forecast_out
         del u_model
+        del random_updater
         if sess is not None:
             sess.close()
             del sess
