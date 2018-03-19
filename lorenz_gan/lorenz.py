@@ -117,7 +117,7 @@ def l96_forecast_step(X, F):
 
 
 def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps,
-                          num_random, time_step=0.005, x_only=True, call_param_once=False):
+                          num_random, time_step=0.005, x_only=True, call_param_once=False, rs=None):
     """
     Integrate the Lorenz 96 forecast model forward in time from a specified initial state with
     a parameterized subgrid forcing model. The u_model should contain a predict method that
@@ -154,7 +154,10 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     X_out[0] = x_initial[:]
     U_out[0] = u_initial[:]
     k_dXdt = np.zeros((order, x_initial.shape[0]))
-    random_values = np.random.normal(size=(x_initial.size, num_random))
+    if rs is None:
+        random_values = np.random.normal(size=(x_initial.size, num_random))
+    else:
+        random_values = rs.normal(size=(x_initial.size, num_random))
     for n in range(1, num_steps):
         if n % 100 == 0:
             print(n)
