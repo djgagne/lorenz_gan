@@ -73,9 +73,10 @@ class AR1RandomUpdater(object):
         self.corr = np.corrcoef(data[:-1], data[1:])[0, 1]
         self.noise_sd = np.sqrt(1 - self.corr ** 2)
 
-    def update(self, random_values):
+    def update(self, random_values, rs=None):
         return self.corr * random_values + norm.rvs(size=random_values.shape,
-                                                    loc=0, scale=self.noise_sd)
+                                                    loc=0, scale=self.noise_sd, 
+                                                    random_state=rs)
 
 
 class SubModelPoly(object):

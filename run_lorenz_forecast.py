@@ -65,7 +65,7 @@ def main():
                                  call_param_once, out_path)
     else:
 
-        pool = Pool(args.proc, maxtasksperchild=10)
+        pool = Pool(args.proc)
         for step in initial_steps:
             step_index = np.where(step_values == step)[0][0]
             x_initial = lorenz_output["lorenz_x"][step_index].values
@@ -131,12 +131,12 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
 
     """
     try:
-        np.random.seed(random_seed)
+        rand = np.random.RandomState(random_seed)
         if u_model_path == "h5":
             K.tf.set_random_seed(random_seed)
         print("Starting member {0:d}".format(member_number))
         forecast_out = run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps, num_random,
-                                             time_step, x_only=x_only, call_param_once=call_param_once)
+                                             time_step, x_only=x_only, call_param_once=call_param_once, rs=rand)
         forecast_out.attrs["initial_step"] = initial_step_value
         forecast_out.attrs["member"] = member_number
         forecast_out.attrs["u_model_path"] = u_model_path
