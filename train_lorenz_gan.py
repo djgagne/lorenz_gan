@@ -161,6 +161,9 @@ def train_lorenz_gan(config, combined_data):
     if config["gan"]["structure"] == "dense":
         gen_model = generator_dense(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
+    elif config["gan"]["structure"] == "concrete":
+        gen_model = generator_conv_concrete(**config["gan"]["generator"])
+        disc_model = discriminator_conv_concrete(**config["gan"]["discriminator"])
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])

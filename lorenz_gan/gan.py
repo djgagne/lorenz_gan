@@ -1,5 +1,6 @@
 from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
-from keras.layers import Conv1D, UpSampling1D, Dense, Activation, Reshape, LeakyReLU, Layer, MaxPool1D
+from keras.layers import Conv1D, UpSampling1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
+from keras.layers import Add, Average
 from keras.initializers import RandomUniform
 import keras.backend as K
 from keras.optimizers import Adam
@@ -11,7 +12,8 @@ import pandas as pd
 from os.path import join
 from keras.regularizers import l2
 from keras.engine import InputSpec
-from keras.layers import Dense, Lambda, Wrapper
+from keras.layers import Dense, Wrapper
+
 
 class Interpolate1D(Layer):
     def __init__(self, **kwargs):
@@ -171,7 +173,7 @@ def predict_stochastic(neural_net):
 
 def generator_conv_concrete(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
                    activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3,
-                   dropout_alpha=0.2, data_size=1.0e5):
+                   dropout_alpha=0.2, data_size=1.0e5, normalize=True):
     """
     Convolutional conditional generator neural network. The conditional generator takes a combined vector of
     normalized conditional and random values and outputs normalized synthetic examples of the training data.
@@ -225,14 +227,15 @@ def generator_conv_concrete(num_cond_inputs=3, num_random_inputs=10, num_outputs
         gen_model = Interpolate1D()(gen_model)
         data_width *= 2
     gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
-    #gen_model = BatchNormalization()(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
 
 def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
                    activation="selu", min_conv_filters=8, min_data_width=4, filter_width=3,
-                   dropout_alpha=0.2):
+                   dropout_alpha=0.2, normalize=True):
     """
     Convolutional conditional generator neural network. The conditional generator takes a combined vector of
     normalized conditional and random values and outputs normalized synthetic examples of the training data.
@@ -248,6 +251,8 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
         min_data_width (int): Width of the first convolutional layer after the dense layer. Should be a power
             of 2.
         filter_width (int): Width of the convolutional filters
+        dropout_alpha (float): Proportion of neurons randomly set to 0.
+        normalize (bool): Whether to include a batch normalization layer at the end of the model.
     Returns:
         generator: Keras Model object of the generator network
     """
@@ -284,8 +289,46 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
         gen_model = Interpolate1D()(gen_model)
         data_width *= 2
     gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
-    gen_model = BatchNormalization()(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
+    return generator
+
+
+def generator_conv_conditional(num_cond_inputs=2, num_random_inputs=1, num_outputs=32, activation="relu",
+                               filter_width=5, min_conv_filters=8, min_data_width=4,
+                               dropout_alpha=0.5, normalize=True):
+    num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
+    max_conv_filters = int(min_conv_filters * 2 ** (num_layers))
+    curr_conv_filters = max_conv_filters
+    gen_cond_input = Input(shape=(num_cond_inputs, ))
+    gen_rand_input = Input(shape=(num_random_inputs, ))
+    gen_model = Dense(min_data_width * max_conv_filters)(gen_cond_input)
+    gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
+    data_width = min_data_width
+    for i in range(0, num_layers):
+        curr_conv_filters //= 2
+        if data_width < filter_width:
+            f_width = 3
+        else:
+            f_width = filter_width
+        gen_model = Conv1D(curr_conv_filters, f_width, padding="same", kernel_regularizer=l2())(gen_model)
+        if activation == "leaky":
+            gen_model = LeakyReLU(0.2)(gen_model)
+        else:
+            gen_model = Activation(activation)(gen_model)
+        if activation == "selu":
+            gen_model = Dropout(dropout_alpha)(gen_model)
+        else:
+            gen_model = Dropout(dropout_alpha)(gen_model)
+        gen_model = Interpolate1D()(gen_model)
+        data_width *= 2
+    gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
+    gen_rand_vec = RepeatVector(num_outputs)(gen_rand_input)
+
+    generator = Model(gen_cond_input, gen_model)
     return generator
 
 
@@ -326,9 +369,8 @@ def discriminator_conv_concrete(num_cond_inputs=3, num_sample_inputs=32, activat
             disc_model = LeakyReLU(0.2)(disc_model)
         else:
             disc_model = Activation(activation)(disc_model)
-        #if i > 0:
-        #isc_model = BatchNormalization()(disc_model)
-        disc_model = MaxPool1D()(disc_model)
+        disc_model = BatchNormalization()(disc_model)
+        disc_model = AveragePooling1D()(disc_model)
         curr_conv_filters *= 2
     disc_model = ConcreteDropout(Conv1D(curr_conv_filters, filter_width,
                                         padding="same", kernel_regularizer=l2()),
@@ -337,10 +379,7 @@ def discriminator_conv_concrete(num_cond_inputs=3, num_sample_inputs=32, activat
         disc_model = LeakyReLU(0.2)(disc_model)
     else:
         disc_model = Activation(activation)(disc_model)
-    #disc_model = BatchNormalization()(disc_model)
     disc_model = Flatten()(disc_model)
-    #disc_model = Dropout(dropout_alpha)(disc_model)
-
     disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
@@ -380,8 +419,6 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
             disc_model = LeakyReLU(0.2)(disc_model)
         else:
             disc_model = Activation(activation)(disc_model)
-        #if i > 0:
-        #    disc_model = BatchNormalization()(disc_model)
         disc_model = Dropout(dropout_alpha)(disc_model)
         disc_model = MaxPool1D()(disc_model)
         curr_conv_filters *= 2
@@ -390,8 +427,6 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
         disc_model = LeakyReLU(0.2)(disc_model)
     else:
         disc_model = Activation(activation)(disc_model)
-   #disc_model = Dropout(dropout_alpha)(disc_model)
-    #disc_model = BatchNormalization()(disc_model)
     disc_model = Flatten()(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
@@ -591,13 +626,8 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
         for b, b_index in enumerate(np.arange(batch_size, train_sample_data.shape[0], batch_size * 2)):
             batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
             gen_batch_vec[:] = np.random.normal(size=(batch_size, random_vec_size))
-
-            #gen_cond_data_batch[:] = generate_random_condition_data(batch_size, train_cond_data.shape[1],
-            #                                                        train_cond_exp_scale)
             gen_cond_data_batch[:] = train_cond_data[train_order[b_index: b_index + batch_size]]
             combo_cond_data_batch[:] = train_cond_data[train_order[b_index - batch_size: b_index]]
-            #combo_cond_data_batch[batch_half:] = generate_random_condition_data(batch_half, train_cond_data.shape[1],
-            #                                                                    train_cond_exp_scale)
             combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_size: b_index - batch_half]]
             combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:, :, 0],
                                                            batch_vec[batch_half:], True])[0]

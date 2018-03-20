@@ -98,7 +98,7 @@ class SubModelPoly(object):
         sampled_u = self.model.predict(x_terms).reshape(cond_x.shape)
         if self.noise_type == "additive":
             sampled_u += random_x
-        if self.noise_type == "multiplicative":
+        elif self.noise_type == "multiplicative":
             sampled_u = (1 + random_x) * sampled_u
         return sampled_u.ravel()
 

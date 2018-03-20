@@ -24,7 +24,7 @@ gan:
         min_conv_filters: 8
         min_data_width: 8
         filter_width: 5
-        dropout_alpha: 0.4
+        dropout_alpha: 0
         normalize: 1
     discriminator:
         num_cond_inputs: 2
@@ -36,7 +36,7 @@ gan:
         dropout_alpha: 0.05
     gan_path: /glade/p/work/dgagne/exp_u/
     batch_size: 128
-    gan_index: 0
+    gan_index: 2
     loss: binary_crossentropy
     learning_rate: 0.0002
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
@@ -49,8 +49,8 @@ histogram:
     out_file: /glade/p/work/dgagne/exp_u/u_histogram.pkl
 poly:
     num_terms: 3
-    noise_type: additive
-    out_file: /glade/p/work/dgagne/exp_u/u_poly.pkl
+    noise_type: none
+    out_file: /glade/p/work/dgagne/exp_u/u_poly_det.pkl
 output_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
 output_csv_file: /glade/p/work/dgagne/exp_u/lorenz_combined_output.csv
 num_procs: 36
