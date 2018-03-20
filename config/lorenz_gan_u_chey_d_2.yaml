@@ -34,7 +34,7 @@ gan:
         min_data_width: 8
         filter_width: 5
         dropout_alpha: 0.05
-    gan_path: /glade/p/work/dgagne/exp_u/
+    gan_path: /glade/scratch/dgagne/exp_u/
     batch_size: 128
     gan_index: 1
     loss: binary_crossentropy
@@ -42,15 +42,15 @@ gan:
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     metrics: ["accuracy"]
 random_updater:
-    out_file: /glade/p/work/dgagne/exp_u/ar1_random_updater.pkl
+    out_file: /glade/scratch/dgagne/exp_u/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: /glade/p/work/dgagne/exp_u/u_histogram.pkl
+    out_file: /glade/scratch/dgagne/exp_u/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: multiplicative
-    out_file: /glade/p/work/dgagne/exp_u/u_poly_multi.pkl
-output_nc_file: /glade/p/work/dgagne/exp_u/lorenz_output.nc
-output_csv_file: /glade/p/work/dgagne/exp_u/lorenz_combined_output.csv
+    out_file: /glade/scratch/dgagne/exp_u/u_poly_multi.pkl
+output_nc_file: /glade/scratch/dgagne/exp_u/lorenz_output.nc
+output_csv_file: /glade/scratch/dgagne/exp_u/lorenz_combined_output.csv
 num_procs: 36
