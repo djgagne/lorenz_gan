@@ -25,7 +25,7 @@ gan:
         min_data_width: 8
         filter_width: 5
         dropout_alpha: 0
-        normalize: 1
+        normalize: 0
     discriminator:
         num_cond_inputs: 2
         num_sample_inputs: 32

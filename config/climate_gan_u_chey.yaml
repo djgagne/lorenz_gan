@@ -12,5 +12,5 @@ initial_step: 2000000
 x_only: 0
 call_param_once: 1
 lorenz_nc_file: /glade/scratch/dgagne/exp_u/lorenz_output.nc
-out_path: /glade/scratch/dgagne/exp_u/gan_climate/
+out_path: /glade/scratch/dgagne/exp_u/gan_4_climate/
 num_tf_threads: 8
