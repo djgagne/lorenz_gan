@@ -705,8 +705,9 @@ def normalize_data(data, scaling_values=None):
     if scaling_values is None:
         scaling_values = pd.DataFrame(np.zeros((data.shape[-1], len(scale_cols)), dtype=np.float32),
                                       columns=scale_cols)
+        for i in range(data.shape[-1]):
+            scaling_values.loc[i, ["mean", "std"]] = [data[..., i].mean(), data[..., i].std()]
     for i in range(data.shape[-1]):
-        scaling_values.loc[i, ["mean", "std"]] = [data[..., i].mean(), data[..., i].std()]
         normed_data[..., i] = (data[..., i] - scaling_values.loc[i, "mean"]) / scaling_values.loc[i, "std"]
     return normed_data, scaling_values
 
