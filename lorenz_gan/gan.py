@@ -262,7 +262,11 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_cond_repeat = RepeatVector(min_data_width)(gen_cond_input)
     gen_rand_input = Input(shape=(num_random_inputs, ))
-    gen_model = Reshape((num_random_inputs, 1))(gen_rand_input)
+    if num_random_inputs == min_data_width:
+        gen_model = Reshape((num_random_inputs, 1))(gen_rand_input)
+    else:
+        num_random_filters = num_random_inputs // min_data_width
+        gen_model = Reshape((min_data_width, num_random_filters))(gen_rand_input)
     gen_model = Conv1D(max_conv_filters, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
     if activation == "leaky":
         gen_model = LeakyReLU(0.2)(gen_model)
@@ -687,10 +691,10 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
 
 def normalize_data(data, scaling_values=None):
     """
-    Normalize each channel in the 4 dimensional data matrix independently.
+    Normalize each channel in the multi dimensional data matrix independently.
 
     Args:
-        data: 4-dimensional array with dimensions (example, y, channel/variable)
+        data: multi-dimensional array with dimensions (example, ..., channel/variable)
         scaling_values: pandas dataframe containing mean and std columns
 
     Returns:
@@ -702,8 +706,8 @@ def normalize_data(data, scaling_values=None):
         scaling_values = pd.DataFrame(np.zeros((data.shape[-1], len(scale_cols)), dtype=np.float32),
                                       columns=scale_cols)
     for i in range(data.shape[-1]):
-        scaling_values.loc[i, ["mean", "std"]] = [data[:, :, i].mean(), data[:, :, i].std()]
-        normed_data[:, :, i] = (data[:, :, i] - scaling_values.loc[i, "mean"]) / scaling_values.loc[i, "std"]
+        scaling_values.loc[i, ["mean", "std"]] = [data[..., i].mean(), data[..., i].std()]
+        normed_data[..., i] = (data[..., i] - scaling_values.loc[i, "mean"]) / scaling_values.loc[i, "std"]
     return normed_data, scaling_values
 
 
@@ -720,7 +724,7 @@ def unnormalize_data(normed_data, scaling_values):
     """
     data = np.zeros(normed_data.shape, dtype=normed_data.dtype)
     for i in range(normed_data.shape[-1]):
-        data[:, :, i] = normed_data[:, :, i] * scaling_values.loc[i, "std"] + scaling_values.loc[i, "mean"]
+        data[..., i] = normed_data[..., i] * scaling_values.loc[i, "std"] + scaling_values.loc[i, "mean"]
     return data
 
 

@@ -4,7 +4,7 @@ lorenz:
     h: 1
     b: 10.0
     c: 10.0
-    F: 30.0
+    F: 20.0
     time_step: 0.001
     num_steps: 2000000
     skip: 5
@@ -50,6 +50,6 @@ histogram:
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: ./exp_u/u_poly.pkl
-output_nc_file: ./exp_u/lorenz_output.nc
-output_csv_file: ./exp_u/lorenz_combined_output.csv
+    out_file: ./exp_20/u_poly.pkl
+output_nc_file: ./exp_20/lorenz_output.nc
+output_csv_file: ./exp_20/lorenz_combined_output.csv

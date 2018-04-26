@@ -1,7 +1,7 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
-from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly
+from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd
 import xarray as xr
 import keras.backend as K
 from keras.optimizers import Adam
@@ -82,6 +82,7 @@ def main():
         combined_data = pd.read_csv(config["output_csv_file"])
         lorenz_output = xr.open_dataset(config["output_nc_file"])
         X_out = lorenz_output["lorenz_x"].values
+        Y_out = lorenz_output["lorenz_y"].values
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
         print(X_out.shape, Y_out.shape, saved_steps, split_step)
@@ -89,14 +90,20 @@ def main():
                                             steps[:split_step],
                                             config["lorenz"]["J"], config["gan"]["x_skip"],
                                             config["gan"]["t_skip"], u_scale)
+        combined_test_data = process_lorenz_data(X_out[split_step:], Y_out[split_step:], times[split_step:],
+                                                 steps[split_step:],
+                                                 config["lorenz"]["J"], config["gan"]["x_skip"],
+                                                 config["gan"]["t_skip"], u_scale)
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
+        combined_test_data.to_csv(str(config["output_csv_file"]).replace(".csv", "_test.csv"))
     y_cols = combined_data.columns[combined_data.columns.str.contains("Y")]
     train_random_updater(X_out[:, 5], config["random_updater"]["out_file"])
     u_vals = u_scale * combined_data[y_cols].sum(axis=1).values
     train_histogram(combined_data["X_t"].values,
                     u_vals, **config["histogram"])
     train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
+    train_poly_add(X_out[:split_step-1, 0], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1))
     if args.gan:
         train_lorenz_gan(config, combined_data)
     return
@@ -203,6 +210,12 @@ def train_poly(x_data, u_data, num_terms=3, noise_type="additive", out_file="./p
         pickle.dump(poly_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
     return
 
+
+def train_poly_add(x_data, u_data, num_terms=3, out_file=None):
+    poly_add_model = SubModelPolyAdd(num_terms=num_terms)
+    poly_add_model.fit(x_data, u_data)
+    with open(out_file, "wb") as out_file_obj:
+        pickle.dump(poly_add_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main()

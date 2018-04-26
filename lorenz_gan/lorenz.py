@@ -202,6 +202,7 @@ def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
     X_series_list = []
     Y_series_list = []
     U_series_list = []
+    U_total_series_list = []
     x_s = np.arange(0, X_out.shape[1], x_skip)
     t_s = np.arange(0, X_out.shape[0] - 1, t_skip)
     time_list = []
@@ -211,6 +212,7 @@ def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
         X_series_list.append(X_out[t_s, k: k + 1])
         Y_series_list.append(Y_out[1::t_skip, k * J: (k+1) * J])
         U_series_list.append(np.expand_dims(u_scale * Y_out[t_s, k * J: (k+1) * J].sum(axis=1), 1))
+        U_total_series_list.append(np.expand_dims(u_scale * Y_series_list[-1].sum(axis=1), 1))
         time_list.append(times[t_s])
         step_list.append(steps[t_s])
         x_list.append(np.ones(time_list[-1].size) * k)
@@ -218,17 +220,18 @@ def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
     X_series = np.vstack(X_series_list)
     Y_series = np.vstack(Y_series_list)
     U_series = np.vstack(U_series_list)
+    U_total_series = np.vstack(U_total_series_list)
     x_cols = ["X_t"]
     y_cols = ["Y_{0:d}".format(y) for y in range(J)]
-    u_col = "U_t"
+    u_cols = ["U_t", "U_t+1"]
     combined_data = pd.DataFrame(X_series, columns=x_cols)
     combined_data = pd.concat([combined_data, pd.DataFrame(Y_series, columns=y_cols)], axis=1)
     combined_data.loc[:, "time"] = np.concatenate(time_list)
     combined_data.loc[:, "step"] = np.concatenate(step_list)
     combined_data.loc[:, "x_index"] = np.concatenate(x_list)
-    combined_data.loc[:, u_col] = U_series
+    combined_data.loc[:, u_cols] = [U_series, U_total_series]
     combined_data.loc[:, "u_scale"] = u_scale
-    out_cols = ["x_index", "step", "time"] + x_cols + y_cols + [u_col, 'u_scale']
+    out_cols = ["x_index", "step", "time"] + x_cols + y_cols + u_cols + ['u_scale']
     return combined_data.loc[:, out_cols]
 
 

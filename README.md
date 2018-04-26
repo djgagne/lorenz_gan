@@ -12,6 +12,7 @@ Reqiured Python Libraries:
 * scikit-learn
 * netcdf4
 * pyyaml
+* numba
 
 ## Installation
 The Anaconda or Miniconda Python distribution is recommended for managing the dependencies for the 
