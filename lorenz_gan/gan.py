@@ -1,6 +1,6 @@
 from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
-from keras.layers import Conv1D, UpSampling1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
-from keras.layers import Add, Average
+from keras.layers import Conv1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
+from keras.layers import GaussianNoise
 from keras.initializers import RandomUniform
 import keras.backend as K
 from keras.optimizers import Adam
@@ -438,8 +438,8 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
     return discriminator
 
 
-def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden=20, num_outputs=32,
-                    dropout_alpha=0.2, activation="selu"):
+def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1, num_hidden_neurons=8, num_outputs=1,
+                    dropout_alpha=0.2, noise_sd=1, activation="selu", l2_strength=0.01):
     """
     Dense conditional generator network. Includes 1 hidden layer.
 
@@ -456,31 +456,33 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden=20, num_o
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
-    gen_model = Dense(num_hidden, kernel_regularizer=l2())(gen_model)
-    if activation == "leaky":
-        gen_model = LeakyReLU(0.2)(gen_model)
-    else:
-        gen_model = Activation(activation)(gen_model)
-    if activation == "selu":
-        gen_model = AlphaDropout(dropout_alpha)(gen_model)
-    else:
-        gen_model = Dropout(dropout_alpha)(gen_model)
+    for h in range(num_hidden_layers):
+        gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
+        if activation == "leaky":
+            gen_model = LeakyReLU(0.2)(gen_model)
+        else:
+            gen_model = Activation(activation)(gen_model)
+            gen_model = Dropout(dropout_alpha)(gen_model)
+            gen_model = GaussianNoise(noise_sd)(gen_model)
     gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
 
-def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, activation="selu"):
+def discriminator_dense(num_cond_inputs=1, num_sample_inputs=1, num_hidden_neurons=8,
+                        num_hidden_layers=2, activation="selu", l2_strength=0.01, dropout_alpha=0):
     """
     Dense conditional discriminator network.
 
     Args:
         num_cond_inputs (int): Size of the conditional input vector
         num_sample_inputs (int): Size of the sample input vector
-        num_hidden (int): Number of hidden neurons
+        num_hidden_neurons (int): Number of hidden neurons
+        num_hidden_layers (int): Number of hidden layers
         activation (str): Type of activation function
-
+        l2_strength (float): Weight of l2 regularization on hidden layers
+        dropout_alpha (float): Proportion (0 to 1) of previous inputs zeroed out
     Returns:
         Discriminator model
     """
@@ -488,12 +490,14 @@ def discriminator_dense(num_cond_inputs=3, num_sample_inputs=32, num_hidden=20, 
     disc_sample_input = Input(shape=(num_sample_inputs, 1))
     disc_sample_flat = Flatten()(disc_sample_input)
     disc_model = concatenate([disc_cond_input, disc_sample_flat])
-    disc_model = Dense(num_hidden, kernel_regularizer=l2())(disc_model)
-    if activation == "leaky":
-        disc_model = LeakyReLU(0.2)(disc_model)
-    else:
-        disc_model = Activation(activation)(disc_model)
-    disc_model = Dense(1, kernel_regularizer=l2())(disc_model)
+    for i in range(num_hidden_layers):
+        disc_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(disc_model)
+        if activation == "leaky":
+            disc_model = LeakyReLU(0.2)(disc_model)
+        else:
+            disc_model = Activation(activation)(disc_model)
+        disc_model = Dropout(dropout_alpha)(disc_model)
+    disc_model = Dense(1, kernel_regularizer=l2(l2_strength))(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
     return discriminator

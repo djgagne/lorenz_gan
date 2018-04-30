@@ -6,7 +6,7 @@ lorenz:
     c: 10.0
     F: 20.0
     time_step: 0.001
-    num_steps: 2000000
+    num_steps: 100000
     skip: 5
     burn_in: 2000
     train_test_split: 0.5
@@ -18,13 +18,13 @@ gan:
     cond_inputs: ["X_t", "U_t"]
     generator:
         num_cond_inputs: 2
-        num_random_inputs: 64
+        num_random_inputs: 4
         num_outputs: 32
         activation: leaky
         min_conv_filters: 8
         min_data_width: 4
         filter_width: 5
-        dropout_alpha: 0.0
+        dropout_alpha: 0.5
         normalize: 1
     discriminator:
         num_cond_inputs: 2
@@ -34,25 +34,25 @@ gan:
         min_data_width: 4
         filter_width: 5
         dropout_alpha: 0.1
-    gan_path: ./exp_20
-    batch_size: 128
-    gan_index: 5
+    gan_path: ./exp_travis
+    batch_size: 256
+    gan_index: 0
     loss: binary_crossentropy
     learning_rate: 0.0002
-    num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    num_epochs: [1, 2, 3, 4, 5]
     metrics: ["accuracy"]
 random_updater:
-    out_file: ./exp_20/ar1_random_updater.pkl
+    out_file: ./exp_travis/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: ./exp_20/u_histogram.pkl
+    out_file: ./exp_travis/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: ./exp_20/u_poly.pkl
+    out_file: ./exp_travis/u_poly.pkl
 poly_add:
     num_terms: 3
-    out_file: ./exp_20/u_poly_add.pkl
-output_nc_file: ./exp_20/lorenz_output.nc
-output_csv_file: ./exp_20/lorenz_combined_output.csv
+    out_file: ./exp_travis/u_poly_add.pkl
+output_nc_file: ./exp_travis/lorenz_output.nc
+output_csv_file: ./exp_travis/lorenz_combined_output.csv

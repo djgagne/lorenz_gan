@@ -4,7 +4,7 @@ import yaml
 import argparse
 import keras.backend as K
 from lorenz_gan.lorenz import run_lorenz96_forecast
-from lorenz_gan.submodels import SubModelGAN
+from lorenz_gan.submodels import SubModelGAN, load_ann_model
 from multiprocessing import Pool
 import pickle
 import traceback
@@ -62,7 +62,7 @@ def main():
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             launch_forecast_step(members, np.copy(x_initial), u_initial, f, u_model_path, random_updater_path,
                                  num_steps, num_random, time_step, random_seeds, step, x_only,
-                                 call_param_once, out_path)
+                                 call_param_once, out_path, num_tf_threads)
     else:
 
         pool = Pool(args.proc)
@@ -93,6 +93,11 @@ def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_
                                                     inter_op_parallelism_threads=1))
         K.set_session(sess)
         u_model = SubModelGAN(u_model_path)
+    elif "ann_res" in u_model_path.split("/")[-1]:
+        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+                                                    inter_op_parallelism_threads=1))
+        K.set_session(sess)
+        u_model = load_ann_model(u_model_path)
     else:
         with open(u_model_path, "rb") as u_model_file:
             u_model = pickle.load(u_model_file)
