@@ -1,5 +1,7 @@
 # Lorenz '96 with GAN parameterization
 
+[![Build Status](https://travis-ci.org/djgagne/lorenz_gan.svg?branch=master)](https://travis-ci.org/djgagne/lorenz_gan)
+
 Reqiured Python Libraries:
 * numpy
 * scipy

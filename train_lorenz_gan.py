@@ -103,7 +103,7 @@ def main():
     train_histogram(combined_data["X_t"].values,
                     u_vals, **config["histogram"])
     train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
-    train_poly_add(X_out[:split_step-1, 0], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
+    train_poly_add(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
                    **config["poly_add"])
     if args.gan:
         train_lorenz_gan(config, combined_data)
