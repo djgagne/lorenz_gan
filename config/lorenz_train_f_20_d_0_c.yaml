@@ -33,26 +33,26 @@ gan:
         min_conv_filters: 8
         min_data_width: 4
         filter_width: 5
-        dropout_alpha: 0.1
+        dropout_alpha: 0
     gan_path: ./exp_20
     batch_size: 512
-    gan_index: 0
+    gan_index: 40
     loss: binary_crossentropy
     learning_rate: 0.0002
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     metrics: ["accuracy"]
 random_updater:
-    out_file: ./exp_20/ar1_random_updater.pkl
+    out_file: /glade/p/work/dgagne/lorenz/exp_20/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: ./exp_20/u_histogram.pkl
+    out_file: /glade/p/work/dgagne/exp_20/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: ./exp_20/u_poly.pkl
+    out_file: /glade/p/work/dgagne/exp_20/u_poly.pkl
 poly_add:
     num_terms: 3
-    out_file: ./exp_20/u_poly_add.pkl
-output_nc_file: ./exp_20/lorenz_output.nc
-output_csv_file: ./exp_20/lorenz_combined_output.csv
+    out_file: /glade/p/work/dgagne/exp_20/u_poly_add.pkl
+output_nc_file: /glade/p/work/dgagne/exp_20/lorenz_output.nc
+output_csv_file: /glade/p/work/dgagne/exp_20/lorenz_combined_output.csv
