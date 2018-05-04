@@ -17,7 +17,9 @@ install:
   - pip install keras
   - pip install .
   - mkdir exp_travis
+  - mkdir exp_travis/exp_poly
 script:
   - python train_lorenz_gan.py config/lorenz_gan_travis.yaml -g
+  - python run_lorenz_forecast.py config/forecast_poly_travis.yaml -p 1
 notifications:
   email: true
