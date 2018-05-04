@@ -34,7 +34,7 @@ gan:
         min_data_width: 4
         filter_width: 5
         dropout_alpha: 0
-    gan_path: ./exp_20
+    gan_path: /glade/p/work/dgagne/exp_20
     batch_size: 512
     gan_index: 0
     loss: binary_crossentropy
@@ -42,7 +42,7 @@ gan:
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     metrics: ["accuracy"]
 random_updater:
-    out_file: /glade/p/work/dgagne/lorenz/exp_20/ar1_random_updater.pkl
+    out_file: /glade/p/work/dgagne/exp_20/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
