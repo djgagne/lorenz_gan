@@ -13,5 +13,5 @@ x_only: 1
 call_param_once: 1
 predict_residuals: 1
 lorenz_nc_file: /glade/p/work/dgagne/exp_20/lorenz_output.nc
-out_path: /glade/p/work/dgagne/exp_20/annres_20_climate/
+out_path: /glade/p/work/dgagne/exp_20/annres_00_climate/
 num_tf_threads: 8
