@@ -65,7 +65,7 @@ ann_res:
   res_loss: kullback_leibler_divergence
   noise_sd: 1
   beta_1: 0.9
-  model_path: ./exp_20/
+  model_path: /glade/p/work/dgagne/exp_20/
   dropout_alpha: 0
   num_epochs: 20
   batch_size: 1024
