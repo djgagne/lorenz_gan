@@ -156,6 +156,8 @@ class SubModelANN(object):
                            batch_size=batch_size,
                            verbose=verbose,
                            model_config=model_config)
+        model_path_start = join(model_path.split("/")[:-1])
+        self.x_scaling_file = join(model_path_start, "ann_config_{0}_scale.csv".format(self.config["model_config"]))
         if model_path is None:
             nn_input = Input((inputs, ))
             nn_model = nn_input
@@ -174,8 +176,6 @@ class SubModelANN(object):
             self.x_scaling_values = None
         elif type(model_path) == str:
             self.model = load_model(model_path)
-            model_path_start = join(model_path.split("/")[:-1])
-            self.x_scaling_file = join(model_path_start, "ann_config_{0}_scale.csv".format(self.config["model_config"]))
             self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
     def fit(self, cond_x, u):
@@ -183,6 +183,7 @@ class SubModelANN(object):
                                                        scaling_values=self.x_scaling_values)
         self.model.fit(norm_x, u, batch_size=self.config["batch_size"], epochs=self.config["num_epochs"],
                        verbose=self.config["verbose"])
+        self.x_scaling_values.to_csv(self.x_scaling_file, index_label="Channel")
 
     def predict(self, cond_x, residuals=None):
         norm_x = normalize_data(cond_x, scaling_values=self.x_scaling_values)[0]
@@ -222,7 +223,8 @@ class SubModelANNRes(object):
 
     """
     def __init__(self, mean_inputs=1, hidden_layers=2, hidden_neurons=8,
-                 activation="selu", l2_weight=0.01, learning_rate=0.001, loss="mse",
+                 activation="selu", l2_weight=0.01, learning_rate=0.001, mean_loss="mse",
+                 res_loss="kullback_leibler_divergence",
                  noise_sd=1, beta_1=0.9, model_path=None, dropout_alpha=0.5,
                  num_epochs=10, batch_size=1024, val_split=0.5, verbose=0, model_config=0):
         self.config = dict(mean_inputs=mean_inputs,
@@ -231,7 +233,8 @@ class SubModelANNRes(object):
                            activation=activation,
                            l2_weight=l2_weight,
                            learning_rate=learning_rate,
-                           loss=loss,
+                           mean_loss=mean_loss,
+                           res_loss=res_loss,
                            noise_sd=noise_sd,
                            beta_1=beta_1,
                            dropout_alpha=dropout_alpha,
@@ -243,6 +246,7 @@ class SubModelANNRes(object):
                            val_split=val_split)
         mean_model_file = join(model_path, "annres_config_{0:04d}_mean.nc".format(self.config["model_config"]))
         res_model_file = join(model_path, "annres_config_{0:04d}_res.nc".format(self.config["model_config"]))
+        self.x_scaling_file = join(model_path, "annres_scaling_values_{0:04d}.csv".format(model_config))
         if model_path is None or not exists(mean_model_file):
             nn_input = Input((mean_inputs,))
             nn_model = nn_input
@@ -266,15 +270,13 @@ class SubModelANNRes(object):
                 nn_res = GaussianNoise(noise_sd)(nn_res)
             nn_res = Dense(1)(nn_res)
             self.mean_model = Model(nn_input, nn_model)
-            self.mean_model.compile(Adam(lr=learning_rate, beta_1=beta_1), loss=loss)
+            self.mean_model.compile(Adam(lr=learning_rate, beta_1=beta_1), loss=mean_loss)
             self.res_model = Model([nn_res_input_x, nn_res_input_res], nn_res)
-            self.res_model.compile(Adam(lr=learning_rate, beta_1=beta_1), loss=loss)
-            self.x_scaling_file = None
+            self.res_model.compile(Adam(lr=learning_rate, beta_1=beta_1), loss=res_loss)
             self.x_scaling_values = None
         elif type(model_path) == str:
             self.mean_model = load_model(mean_model_file)
             self.res_model = load_model(res_model_file)
-            self.x_scaling_file = join(model_path, "gan_X_scaling_values_{0}.csv".format(model_config))
             self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
         self.res_predict = K.function(self.res_model.input + [K.learning_phase()], [self.res_model.output])
 
@@ -282,6 +284,7 @@ class SubModelANNRes(object):
         split_index = int(cond_x.shape[0] * self.config["val_split"])
         norm_x, self.x_scaling_values = normalize_data(cond_x,
                                                        scaling_values=self.x_scaling_values)
+        self.x_scaling_values.to_csv(self.x_scaling_file, index_label="Channel")
         self.mean_model.fit(norm_x[:split_index], u[:split_index], batch_size=self.config["batch_size"],
                             epochs=self.config["num_epochs"],
                             verbose=self.config["verbose"])

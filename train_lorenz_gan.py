@@ -1,7 +1,7 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
-from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd
+from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
 import xarray as xr
 import keras.backend as K
 from keras.optimizers import Adam
@@ -103,8 +103,12 @@ def main():
     train_histogram(combined_data["X_t"].values,
                     u_vals, **config["histogram"])
     train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
-    train_poly_add(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
+    if "poly_add" in config.keys():
+        train_poly_add(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
                    **config["poly_add"])
+    if "ann_res" in config.keys():
+        train_ann_res(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
+                      config["ann_res"])
     if args.gan:
         train_lorenz_gan(config, combined_data)
     return
@@ -217,6 +221,12 @@ def train_poly_add(x_data, u_data, num_terms=3, out_file="./poly_add.pkl"):
     poly_add_model.fit(x_data, u_data)
     with open(out_file, "wb") as out_file_obj:
         pickle.dump(poly_add_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
+
+
+def train_ann_res(x_data, u_data, config):
+    ann_res_model = SubModelANNRes(**config)
+    ann_res_model.fit(x_data, u_data)
+    ann_res_model.save_model(config["model_path"])
 
 if __name__ == "__main__":
     main()

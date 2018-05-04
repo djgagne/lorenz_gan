@@ -54,5 +54,23 @@ poly:
 poly_add:
     num_terms: 3
     out_file: ./exp_20/u_poly_add.pkl
+ann_res:
+  mean_inputs: 1
+  hidden_layers: 2
+  hidden_neurons: 8
+  activation: selu
+  l2_weight: 0.01
+  learning_rate: 0.001
+  mean_loss: mse
+  res_loss: kullback_leibler_divergence
+  noise_sd: 1
+  beta_1: 0.9
+  model_path: ./exp_20/
+  dropout_alpha: 0.1
+  num_epochs: 20
+  batch_size: 1024
+  val_split: 0.8
+  verbose: 2
+  model_config: 5
 output_nc_file: ./exp_20/lorenz_output.nc
 output_csv_file: ./exp_20/lorenz_combined_output.csv
