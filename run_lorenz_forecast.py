@@ -43,6 +43,10 @@ def main():
         call_param_once = bool(config["call_param_once"])
     else:
         call_param_once = False
+    if "predict_residuals" in config.keys():
+        predict_residuals = bool(config["predict_residuals"])
+    else:
+        predict_residuals = False
     f = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
     step_values = lorenz_output["step"].values
@@ -62,7 +66,7 @@ def main():
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             launch_forecast_step(members, np.copy(x_initial), u_initial, f, u_model_path, random_updater_path,
                                  num_steps, num_random, time_step, random_seeds, step, x_only,
-                                 call_param_once, out_path, num_tf_threads)
+                                 call_param_once, predict_residuals, out_path, num_tf_threads)
     else:
 
         pool = Pool(args.proc)
@@ -73,16 +77,16 @@ def main():
             u_initial = y_initial.reshape(8, 32).sum(axis=1)
             pool.apply_async(launch_forecast_step, (members, x_initial, u_initial, f, u_model_path,
                                                     random_updater_path, num_steps, num_random, time_step,
-                                                    random_seeds, step, x_only, call_param_once, out_path,
-                                                    num_tf_threads))
+                                                    random_seeds, step, x_only, call_param_once, predict_residuals,
+                                                    out_path, num_tf_threads))
         pool.close()
         pool.join()
     return
 
 
 def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_updater_path, num_steps,
-                         num_random, time_step, random_seeds, initial_step_value, x_only, call_param_once, out_path,
-                         num_tf_threads):
+                         num_random, time_step, random_seeds, initial_step_value, x_only, call_param_once,
+                         predict_residuals, out_path, num_tf_threads):
     step_dir = join(out_path, "{0:08d}".format(initial_step_value))
     if not exists(step_dir):
         os.mkdir(step_dir)
@@ -105,13 +109,14 @@ def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_
     for member in members:
         launch_forecast_member(member, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
                                num_random, time_step, random_seeds[member], initial_step_value, x_only, call_param_once,
-                               out_path)
+                               predict_residuals, out_path)
     if sess is not None:
         sess.close()
 
 
 def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
-                           num_random, time_step, random_seed, initial_step_value, x_only, call_param_once, out_path):
+                           num_random, time_step, random_seed, initial_step_value, x_only, call_param_once,
+                           predict_residuals, out_path):
     """
     Run a single Lorenz 96 forecast model with a specified x and u initial conditions and forcing. The output
     of the run is saved to a netCDF file.
@@ -141,14 +146,17 @@ def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path,
             K.tf.set_random_seed(random_seed)
         print("Starting member {0:d}".format(member_number))
         forecast_out = run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps, num_random,
-                                             time_step, x_only=x_only, call_param_once=call_param_once, rs=rand)
+                                             time_step, x_only=x_only, call_param_once=call_param_once,
+                                             predict_residuals=predict_residuals, rs=rand)
         forecast_out.attrs["initial_step"] = initial_step_value
         forecast_out.attrs["member"] = member_number
         forecast_out.attrs["u_model_path"] = u_model_path
         forecast_out.to_netcdf(join(out_path, "{0:08d}/lorenz_forecast_{0:08d}_{1:02d}.nc".format(initial_step_value,
                                                                                                   member_number)),
                                mode="w", encoding={"x": {"dtype": "float32", "zlib": True, "complevel": 2},
-                                                   "u": {"dtype": "float32", "zlib": True, "complevel": 2}})
+                                                   "u": {"dtype": "float32", "zlib": True, "complevel": 2},
+                                                   "u_res": {"dtype": "float32", "zlib": True, "complevel": 2}
+                                                   })
         forecast_out.close()
     except Exception as e:
         print(traceback.format_exc())

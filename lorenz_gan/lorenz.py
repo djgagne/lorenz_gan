@@ -196,7 +196,7 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
         X_out[n] = x_u_curr[0]
         if not predict_residuals:
             random_values = random_updater.update(random_values)
-    output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, time=times),
+    output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, u_res=U_res_out, time=times),
                         coords=coords)
     return output
 
