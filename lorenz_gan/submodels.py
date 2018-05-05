@@ -130,9 +130,10 @@ class SubModelPolyAdd(object):
         x_terms = np.zeros((x.shape[0], self.num_terms))
         for p in range(1, self.num_terms + 1):
             x_terms[:, p - 1] = x[:, 0] ** p
-        u_mean = self.model.predict(x_terms)
+        u_mean = self.model.predict(x_terms).ravel()
         u_res = self.corr * residuals + \
             self.res_sd * np.sqrt(1 - self.corr ** 2) * np.random.normal(size=residuals.shape)
+        u_res = u_res.ravel()
         return u_mean, u_res
 
 
