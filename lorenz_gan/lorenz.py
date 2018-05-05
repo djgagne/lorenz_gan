@@ -167,21 +167,21 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
             random_values = rs.normal(size=(x_initial.size, num_random))
         U_res_out[0] = random_values[:, 0]
     for n in range(1, num_steps):
-        if n % 100 == 0:
-            print(n)
+        if n % 400 == 0:
+            print(n, x_u_curr[0])
         for o in range(order):
             if o == 0 and predict_residuals:
                 if x_only:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, x_u_curr[2])
+                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, x_u_curr[2:3].T)
                 else:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, x_u_curr[2])
+                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, x_u_curr[2:3].T)
                 U_out[n] = x_u_curr[1] + x_u_curr[2]
                 U_res_out[n] = x_u_curr[2]
             elif o == 0 and not predict_residuals:
                 if x_only:
                     x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
                 else:
-                    x_u_curr[1] = u_model.predict(x_u_curr.T, random_values)
+                    x_u_curr[1] = u_model.predict(x_u_curr[0:2].T, random_values)
                 U_out[n] = x_u_curr[1]
                 U_res_out[n] = random_values[:, 0]
             elif o > 0 and not call_param_once:

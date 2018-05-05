@@ -18,8 +18,12 @@ install:
   - pip install .
   - mkdir exp_travis
   - mkdir exp_travis/exp_poly
+  - mkdir exp_travis/exp_gan
+  - mkdir exp_travis/exp_ann
 script:
   - python train_lorenz_gan.py config/lorenz_gan_travis.yaml -g
   - python run_lorenz_forecast.py config/forecast_poly_travis.yaml -p 1
+  - python run_lorenz_forecast.py config/forecast_ann_travis.yaml -p 2
+  - python run_lorenz_forecast.py config/forecast_gan_travis.yaml -p 1
 notifications:
   email: true

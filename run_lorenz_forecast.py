@@ -87,31 +87,35 @@ def main():
 def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_updater_path, num_steps,
                          num_random, time_step, random_seeds, initial_step_value, x_only, call_param_once,
                          predict_residuals, out_path, num_tf_threads):
-    step_dir = join(out_path, "{0:08d}".format(initial_step_value))
-    if not exists(step_dir):
-        os.mkdir(step_dir)
-    with open(random_updater_path, "rb") as random_updater_file:
-        random_updater = pickle.load(random_updater_file)
-    if u_model_path[-2:] == "h5":
-        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
-                                                    inter_op_parallelism_threads=1))
-        K.set_session(sess)
-        u_model = SubModelGAN(u_model_path)
-    elif "ann_res" in u_model_path.split("/")[-1]:
-        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
-                                                    inter_op_parallelism_threads=1))
-        K.set_session(sess)
-        u_model = load_ann_model(u_model_path)
-    else:
-        with open(u_model_path, "rb") as u_model_file:
-            u_model = pickle.load(u_model_file)
-        sess = None
-    for member in members:
-        launch_forecast_member(member, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
-                               num_random, time_step, random_seeds[member], initial_step_value, x_only, call_param_once,
-                               predict_residuals, out_path)
-    if sess is not None:
-        sess.close()
+    try:
+        step_dir = join(out_path, "{0:08d}".format(initial_step_value))
+        if not exists(step_dir):
+            os.mkdir(step_dir)
+        with open(random_updater_path, "rb") as random_updater_file:
+            random_updater = pickle.load(random_updater_file)
+        if u_model_path[-2:] == "h5":
+            sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+                                                        inter_op_parallelism_threads=1))
+            K.set_session(sess)
+            u_model = SubModelGAN(u_model_path)
+        elif "annres" in u_model_path.split("/")[-1]:
+            sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+                                                        inter_op_parallelism_threads=1))
+            K.set_session(sess)
+            u_model = load_ann_model(u_model_path)
+        else:
+            with open(u_model_path, "rb") as u_model_file:
+                u_model = pickle.load(u_model_file)
+            sess = None
+        for member in members:
+            launch_forecast_member(member, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
+                                   num_random, time_step, random_seeds[member], initial_step_value, x_only, call_param_once,
+                                   predict_residuals, out_path)
+        if sess is not None:
+            sess.close()
+    except Exception as e:
+        print(traceback.format_exc())
+        raise e
 
 
 def launch_forecast_member(member_number, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
