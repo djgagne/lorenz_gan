@@ -5,7 +5,7 @@ u_model_name: annres
 u_model_path: /glade/p/work/dgagne/exp_20/annres_config_0000_opts.yaml
 random_updater_path: /glade/p/work/dgagne/exp_20/ar1_random_updater.pkl
 num_steps: 2000000
-num_random: 8
+num_random: 1
 time_step: 0.005
 random_seeds: [5000, 5500]
 initial_step: 2000000
