@@ -47,6 +47,10 @@ def main():
         predict_residuals = bool(config["predict_residuals"])
     else:
         predict_residuals = False
+    if "max_tasks" in config.keys():
+        max_tasks = config["max_tasks"]
+    else:
+        max_tasks = 1000
     f = config["F"]
     lorenz_output = xr.open_dataset(config["lorenz_nc_file"])
     step_values = lorenz_output["step"].values
@@ -55,6 +59,7 @@ def main():
         num_tf_threads = config["num_tf_threads"]
     else:
         num_tf_threads = 1
+
     if args.proc == 1:
         for step in initial_steps:
             step_index = np.where(step_values == step)[0][0]
@@ -68,8 +73,7 @@ def main():
                                  num_steps, num_random, time_step, random_seeds, step, x_only,
                                  call_param_once, predict_residuals, out_path, num_tf_threads)
     else:
-
-        pool = Pool(args.proc)
+        pool = Pool(args.proc, maxtasksperchild=max_tasks)
         for step in initial_steps:
             step_index = np.where(step_values == step)[0][0]
             x_initial = lorenz_output["lorenz_x"][step_index].values
