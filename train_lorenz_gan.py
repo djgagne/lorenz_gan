@@ -82,32 +82,40 @@ def main():
         combined_data = pd.read_csv(config["output_csv_file"])
         lorenz_output = xr.open_dataset(config["output_nc_file"])
         X_out = lorenz_output["lorenz_x"].values
-        Y_out = lorenz_output["lorenz_y"].values
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
         print(X_out.shape, Y_out.shape, saved_steps, split_step)
         combined_data = process_lorenz_data(X_out[:split_step], Y_out[:split_step], times[:split_step],
                                             steps[:split_step],
-                                            config["lorenz"]["J"], config["gan"]["x_skip"],
+                                            config["lorenz"]["J"], config["lorenz"]["F"],
+                                            config["lorenz"]["time_step"] * config["lorenz"]["skip"],
+                                            config["gan"]["x_skip"],
                                             config["gan"]["t_skip"], u_scale)
         combined_test_data = process_lorenz_data(X_out[split_step:], Y_out[split_step:], times[split_step:],
                                                  steps[split_step:],
-                                                 config["lorenz"]["J"], config["gan"]["x_skip"],
+                                                 config["lorenz"]["J"], config["lorenz"]["F"],
+                                                 config["lorenz"]["time_step"] * config["lorenz"]["skip"],
+                                                 config["gan"]["x_skip"],
                                                  config["gan"]["t_skip"], u_scale)
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
         combined_test_data.to_csv(str(config["output_csv_file"]).replace(".csv", "_test.csv"))
-    y_cols = combined_data.columns[combined_data.columns.str.contains("Y")]
     train_random_updater(X_out[:, 5], config["random_updater"]["out_file"])
-    u_vals = u_scale * combined_data[y_cols].sum(axis=1).values
+    u_vals = combined_data["u_scale"] * combined_data["Ux_t+1"]
     train_histogram(combined_data["X_t"].values,
                     u_vals, **config["histogram"])
     train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
+    x_time_series = X_out[:split_step-1, 0:1]
+    u_time_series = (-X_out[:split_step-1, -1] * (X_out[:split_step-1, -2] - X_out[:split_step-1, 1])
+                     - X_out[:split_step-1, 0] + config["lorenz"]["F"]) - (X_out[1:split_step, 0] - X_out[:split_step-1, 0]) / config["lorenz"]["time_step"] / config["lorenz"]["skip"]
+    print(u_time_series.min(), u_time_series.max(), u_time_series.mean())
     if "poly_add" in config.keys():
-        train_poly_add(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
-                   **config["poly_add"])
+        train_poly_add(x_time_series,
+                       u_time_series,
+                       **config["poly_add"])
     if "ann_res" in config.keys():
-        train_ann_res(X_out[:split_step-1, 0:1], u_scale * Y_out[1:split_step, 0: config["lorenz"]["J"]].sum(axis=1),
+        train_ann_res(x_time_series,
+                      u_time_series,
                       config["ann_res"])
     if args.gan:
         train_lorenz_gan(config, combined_data)
@@ -133,7 +141,7 @@ def generate_lorenz_data(config):
     x_out, y_out, times, steps = run_lorenz96_truth(x, y, config["h"], config["F"], config["b"],
                                                     config["c"], config["time_step"], config["num_steps"],
                                                     config["burn_in"], skip)
-    return (x_out, y_out, times, steps)
+    return x_out, y_out, times, steps
 
 
 def train_lorenz_gan(config, combined_data):
@@ -155,9 +163,9 @@ def train_lorenz_gan(config, combined_data):
                                                 inter_op_parallelism_threads=1))
     K.set_session(sess)
     x_cols = config["gan"]["cond_inputs"]
-    X_series = np.expand_dims(combined_data[x_cols].values, axis=-1)
-    Y_series = np.expand_dims(combined_data[["Y_{0:d}".format(y) for y in range(config["lorenz"]["J"])]].values,
-                              axis=-1)
+    y_cols = config["gan"]["output_cols"]
+    X_series = combined_data[x_cols].values
+    Y_series = combined_data[y_cols].values
     X_norm, X_scaling_values = normalize_data(X_series)
     if config["gan"]["output"].lower() == "mean":
         Y_norm, Y_scaling_values = normalize_data(np.expand_dims(Y_series.mean(axis=1), axis=-1))
@@ -179,19 +187,15 @@ def train_lorenz_gan(config, combined_data):
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])
-    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5)
+    optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5, beta_2=0.9)
     loss = config["gan"]["loss"]
     gen_disc = initialize_gan(gen_model, disc_model, loss, optimizer, config["gan"]["metrics"])
     if trim > 0:
         Y_norm = Y_norm[:-trim]
         X_norm = X_norm[:-trim]
-    print(X_norm.min(), X_norm.max(), X_norm.mean(), X_norm.std())
-    print(X_norm.shape)
-    print(X_series.shape)
-    train_gan(Y_norm, X_norm, gen_model, disc_model, gen_disc, config["gan"]["batch_size"],
+    train_gan(np.expand_dims(Y_norm, -1), X_norm, gen_model, disc_model, gen_disc, config["gan"]["batch_size"],
               config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
-              config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"],
-              Y_scaling_values, X_scaling_values)
+              config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"])
 
 
 def train_random_updater(data, out_file):
@@ -227,6 +231,7 @@ def train_ann_res(x_data, u_data, config):
     ann_res_model = SubModelANNRes(**config)
     ann_res_model.fit(x_data, u_data)
     ann_res_model.save_model(config["model_path"])
+
 
 if __name__ == "__main__":
     main()

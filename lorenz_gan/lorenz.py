@@ -60,8 +60,11 @@ def run_lorenz96_truth(x_initial, y_initial, h, f, b, c, time_step, num_steps, b
     times = steps * time_step
     x = np.zeros(x_initial.shape)
     y = np.zeros(y_initial.shape)
+    # Calculate total Y forcing over archive period using trapezoidal rule
+    y_trap = np.zeros(y_initial.shape)
     x[:] = x_initial
     y[:] = y_initial
+    y_trap[:] = y_initial
     k1_dxdt = np.zeros(x.shape)
     k2_dxdt = np.zeros(x.shape)
     k3_dxdt = np.zeros(x.shape)
@@ -92,8 +95,12 @@ def run_lorenz96_truth(x_initial, y_initial, h, f, b, c, time_step, num_steps, b
         y += (k1_dydt + 2 * k2_dydt + 2 * k3_dydt + k4_dydt) / 6 * time_step
         if n >= burn_in and n % skip == 0:
             x_out[i] = x
-            y_out[i] = y
+            y_out[i] = (y + y_trap) / skip
             i += 1
+        elif n % skip == 1:
+            y_trap[:] = y
+        else:
+            y_trap[:] += y
     return x_out, y_out, times, steps
 
 
@@ -117,7 +124,7 @@ def l96_forecast_step(X, F):
 
 
 def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps,
-                          num_random, time_step=0.005, x_only=True, call_param_once=False,
+                          num_random, time_step=0.005, x_only=True,
                           predict_residuals=False, rs=None):
     """
     Integrate the Lorenz 96 forecast model forward in time from a specified initial state with
@@ -133,7 +140,6 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
         num_random (int): Number of random values used by the parameterization
         time_step (float): Size of the integration time step in MTUs
         x_only (bool): Pass only the x information into the parameterization if True
-        call_param_once (bool): Call the parameterization once per integration time step if True.
         predict_residuals (bool): Predict the residuals of the mean sub-grid state or not
         rs (RandomState): RandomState object used to generate random numbers
 
@@ -169,26 +175,21 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     for n in range(1, num_steps):
         if n % 400 == 0:
             print(n, x_u_curr[0])
+        if predict_residuals:
+            if x_only:
+                x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, x_u_curr[2:3].T)
+            else:
+                x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, x_u_curr[2:3].T)
+            U_out[n] = x_u_curr[1] + x_u_curr[2]
+            U_res_out[n] = x_u_curr[2]
+        else:
+            if x_only:
+                x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
+            else:
+                x_u_curr[1] = u_model.predict(x_u_curr[0:2].T, random_values)
+            U_out[n] = x_u_curr[1]
+            U_res_out[n] = random_values[:, 0]
         for o in range(order):
-            if o == 0 and predict_residuals:
-                if x_only:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, x_u_curr[2:3].T)
-                else:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, x_u_curr[2:3].T)
-                U_out[n] = x_u_curr[1] + x_u_curr[2]
-                U_res_out[n] = x_u_curr[2]
-            elif o == 0 and not predict_residuals:
-                if x_only:
-                    x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
-                else:
-                    x_u_curr[1] = u_model.predict(x_u_curr[0:2].T, random_values)
-                U_out[n] = x_u_curr[1]
-                U_res_out[n] = random_values[:, 0]
-            elif o > 0 and not call_param_once:
-                if x_only:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, random_values)
-                else:
-                    x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, random_values)
             k_dXdt[o] = l96_forecast_step(x_u_curr[0], f) - x_u_curr[1] + x_u_curr[2]
             if o < order - 1:
                 x_u_curr[0] = X_out[n - 1] + k_dXdt[o] * time_inc[o] * time_step
@@ -201,7 +202,7 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     return output
 
 
-def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
+def process_lorenz_data(X_out, Y_out, times, steps, J, F, dt, x_skip, t_skip, u_scale):
     """
     Sample from Lorenz model output and reformat the data into a format more amenable to machine learning.
 
@@ -216,40 +217,49 @@ def process_lorenz_data(X_out, Y_out, times, steps, J, x_skip, t_skip, u_scale):
     Returns:
         combined_data: pandas DataFrame
     """
-    X_series_list = []
-    Y_series_list = []
-    U_series_list = []
-    U_total_series_list = []
+    x_series_list = []
+    y_series_list = []
+    y_prev_list = []
+    ux_series_list = []
+    ux_prev_series_list = []
+    u_series_list = []
+    u_prev_series_list = []
     x_s = np.arange(0, X_out.shape[1], x_skip)
-    t_s = np.arange(0, X_out.shape[0] - 1, t_skip)
+    t_s = np.arange(2, X_out.shape[0] - 1, t_skip)
+    t_p = t_s - 1
     time_list = []
     step_list = []
     x_list = []
+    K = X_out.shape[1]
     for k in x_s:
-        X_series_list.append(X_out[t_s, k: k + 1])
-        Y_series_list.append(Y_out[1::t_skip, k * J: (k+1) * J])
-        U_series_list.append(np.expand_dims(u_scale * Y_out[t_s, k * J: (k+1) * J].sum(axis=1), 1))
-        U_total_series_list.append(np.expand_dims(u_scale * Y_series_list[-1].sum(axis=1), 1))
+        x_series_list.append(X_out[t_s, k: k + 1])
+        ux_series_list.append((-X_out[t_s, k - 1] * (X_out[t_s, k - 2] - X_out[t_s, (k + 1) % K]) - X_out[t_s, k] + F) -
+                              (X_out[t_s + 1, k] - X_out[t_s, k]) / dt)
+        ux_prev_series_list.append((-X_out[t_p, k - 1] * (X_out[t_p, k - 2] - X_out[t_p, (k + 1) % K]) - X_out[t_p, k]
+                                    + F) - (X_out[t_s, k] - X_out[t_p, k]) / dt)
+        y_series_list.append(Y_out[t_s, k * J: (k + 1) * J])
+        y_prev_list.append(Y_out[t_p, k * J: (k + 1) * J])
+        u_series_list.append(np.expand_dims(u_scale * Y_out[t_s, k * J: (k+1) * J].sum(axis=1), 1))
+        u_prev_series_list.append(np.expand_dims(u_scale * Y_out[t_p, k * J: (k+1) * J].sum(axis=1), 1))
         time_list.append(times[t_s])
         step_list.append(steps[t_s])
         x_list.append(np.ones(time_list[-1].size) * k)
-
-    X_series = np.vstack(X_series_list)
-    Y_series = np.vstack(Y_series_list)
-    U_series = np.vstack(U_series_list)
-    U_total_series = np.vstack(U_total_series_list)
     x_cols = ["X_t"]
-    y_cols = ["Y_{0:d}".format(y) for y in range(J)]
-    u_cols = ["U_t", "U_t+1"]
-    combined_data = pd.DataFrame(X_series, columns=x_cols)
+    y_cols = ["Y_t+1_{0:d}".format(y) for y in range(J)]
+    y_p_cols = ["Y_t_{0:d}".format(y) for y in range(J)]
+    u_cols = ["Uy_t", "Uy_t+1", "Ux_t", "Ux_t+1"]
+    combined_data = pd.DataFrame(np.vstack(x_series_list), columns=x_cols)
     combined_data.loc[:, "time"] = np.concatenate(time_list)
     combined_data.loc[:, "step"] = np.concatenate(step_list)
     combined_data.loc[:, "x_index"] = np.concatenate(x_list)
     combined_data.loc[:, "u_scale"] = u_scale
-    combined_data.loc[:, "U_t"] = U_series
-    combined_data.loc[:, "U_t+1"] = U_total_series
-    combined_data = pd.concat([combined_data, pd.DataFrame(Y_series, columns=y_cols)], axis=1)
-    out_cols = ["x_index", "step", "time", "u_scale"] + x_cols + u_cols + y_cols
+    combined_data.loc[:, "Ux_t+1"] = np.concatenate(ux_series_list)
+    combined_data.loc[:, "Ux_t"] = np.concatenate(ux_prev_series_list)
+    combined_data.loc[:, "Uy_t+1"] = np.concatenate(u_series_list)
+    combined_data.loc[:, "Uy_t"] = np.concatenate(u_prev_series_list)
+    combined_data = pd.concat([combined_data, pd.DataFrame(np.vstack(y_prev_list), columns=y_p_cols),
+                               pd.DataFrame(np.vstack(y_series_list), columns=y_cols)], axis=1)
+    out_cols = ["x_index", "step", "time", "u_scale"] + x_cols + u_cols + y_p_cols + y_cols
     return combined_data.loc[:, out_cols]
 
 

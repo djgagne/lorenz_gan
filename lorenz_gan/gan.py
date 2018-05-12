@@ -299,43 +299,6 @@ def generator_conv(num_cond_inputs=3, num_random_inputs=10, num_outputs=32,
     return generator
 
 
-def generator_conv_conditional(num_cond_inputs=2, num_random_inputs=1, num_outputs=32, activation="relu",
-                               filter_width=5, min_conv_filters=8, min_data_width=4,
-                               dropout_alpha=0.5, normalize=True):
-    num_layers = int(np.log2(num_outputs) - np.log2(min_data_width))
-    max_conv_filters = int(min_conv_filters * 2 ** (num_layers))
-    curr_conv_filters = max_conv_filters
-    gen_cond_input = Input(shape=(num_cond_inputs, ))
-    gen_rand_input = Input(shape=(num_random_inputs, ))
-    gen_model = Dense(min_data_width * max_conv_filters)(gen_cond_input)
-    gen_model = Reshape((min_data_width, max_conv_filters))(gen_model)
-    data_width = min_data_width
-    for i in range(0, num_layers):
-        curr_conv_filters //= 2
-        if data_width < filter_width:
-            f_width = 3
-        else:
-            f_width = filter_width
-        gen_model = Conv1D(curr_conv_filters, f_width, padding="same", kernel_regularizer=l2())(gen_model)
-        if activation == "leaky":
-            gen_model = LeakyReLU(0.2)(gen_model)
-        else:
-            gen_model = Activation(activation)(gen_model)
-        if activation == "selu":
-            gen_model = Dropout(dropout_alpha)(gen_model)
-        else:
-            gen_model = Dropout(dropout_alpha)(gen_model)
-        gen_model = Interpolate1D()(gen_model)
-        data_width *= 2
-    gen_model = Conv1D(1, filter_width, padding="same", kernel_regularizer=l2())(gen_model)
-    if normalize:
-        gen_model = BatchNormalization()(gen_model)
-    gen_rand_vec = RepeatVector(num_outputs)(gen_rand_input)
-
-    generator = Model(gen_cond_input, gen_model)
-    return generator
-
-
 def discriminator_conv_concrete(num_cond_inputs=3, num_sample_inputs=32, activation="selu",
                        min_conv_filters=8, min_data_width=4,
                        filter_width=3, dropout_alpha=0.5, data_size=1.0e5):
@@ -439,7 +402,7 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
 
 
 def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1, num_hidden_neurons=8, num_outputs=1,
-                    dropout_alpha=0.2, noise_sd=1, activation="selu", l2_strength=0.01):
+                    dropout_alpha=0.2, activation="selu", l2_strength=0.01, normalize=True):
     """
     Dense conditional generator network. Includes 1 hidden layer.
 
@@ -462,10 +425,11 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1,
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
-            gen_model = Dropout(dropout_alpha)(gen_model)
-            gen_model = GaussianNoise(noise_sd)(gen_model)
+        gen_model = Dropout(dropout_alpha)(gen_model)
     gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
     generator = Model([gen_cond_input, gen_rand_input], gen_model)
     return generator
 
@@ -497,6 +461,7 @@ def discriminator_dense(num_cond_inputs=1, num_sample_inputs=1, num_hidden_neuro
         else:
             disc_model = Activation(activation)(disc_model)
         disc_model = Dropout(dropout_alpha)(disc_model)
+        disc_model = GaussianNoise(0.1)(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2(l2_strength))(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
@@ -585,7 +550,7 @@ def generate_random_condition_data(batch_size, num_cond_inputs, train_cond_scale
 
 def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_disc,
               batch_size, random_vec_size, gan_path, gan_index, num_epochs=(1, 5, 10), metrics=("accuracy",),
-              sample_scaling_values=None, cond_scaling_values=None, out_dtype="float32", epoch_sample_size=1000):
+              out_dtype="float32"):
     """
     Trains the full GAN model on provided training data.
 
@@ -621,9 +586,8 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
     batch_vec = np.zeros((batch_size, random_vec_size))
     gen_batch_vec = np.zeros((batch_size, random_vec_size), dtype=train_sample_data.dtype)
     combo_data_batch = np.zeros(np.concatenate([[batch_size], train_sample_data.shape[1:]]), dtype=out_dtype)
-    combo_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1], 1), dtype=out_dtype)
-    train_cond_exp_scale = fit_condition_distributions(train_cond_data)
-    gen_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1], 1), dtype=out_dtype)
+    combo_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1]), dtype=out_dtype)
+    gen_cond_data_batch = np.zeros((batch_size, train_cond_data.shape[1]), dtype=out_dtype)
     hist_cols = ["Epoch", "Batch", "Disc Loss"] + ["Disc " + m for m in metrics] + \
                 ["Gen Loss"] + ["Gen " + m for m in metrics]
     # Loop over each epoch
@@ -637,12 +601,12 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
             gen_cond_data_batch[:] = train_cond_data[train_order[b_index: b_index + batch_size]]
             combo_cond_data_batch[:] = train_cond_data[train_order[b_index - batch_size: b_index]]
             combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_size: b_index - batch_half]]
-            combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:, :, 0],
+            combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:],
                                                            batch_vec[batch_half:], True])[0]
-            disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch[:, :, 0],
+            disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch,
                                                                    combo_data_batch],
                                                                   batch_labels))
-            gen_loss_history.append(gen_disc.train_on_batch([gen_cond_data_batch[:, :, 0], gen_batch_vec],
+            gen_loss_history.append(gen_disc.train_on_batch([gen_cond_data_batch, gen_batch_vec],
                                                             gen_labels))
             print("Epoch {0:02d}, Batch {1:04d}, Disc Loss: {2:0.4f}, Gen Loss: {3:0.4f}".format(epoch,
                                                                                                  b,
@@ -656,30 +620,6 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
                                                                  pd.Timestamp("now")))
             generator.save(join(gan_path, "gan_generator_{0:04d}_epoch_{1:04d}.h5".format(gan_index, epoch)))
             discriminator.save(join(gan_path, "gan_discriminator_{0:04d}_{1:04d}.h5".format(gan_index, epoch)))
-            gen_noise = np.random.normal(size=(epoch_sample_size, random_vec_size))
-            gen_cond_noise = generate_random_condition_data(epoch_sample_size, train_cond_data.shape[1],
-                                                            train_cond_exp_scale)
-            gen_data_epoch = unnormalize_data(gen_pred_func([gen_cond_noise[:, :, 0], gen_noise, True])[0],
-                                              sample_scaling_values)
-            cond_data_epoch = unnormalize_data(gen_cond_noise, cond_scaling_values)
-            gen_da = {}
-            gen_da["gen_samples"] = xr.DataArray(gen_data_epoch.astype(out_dtype),
-                                               coords={"t": np.arange(gen_data_epoch.shape[0]),
-                                                       "y": np.arange(gen_data_epoch.shape[1]),
-                                                        "channel": np.array([0])},
-                                               dims=("t", "y", "channel"),
-                                               attrs={"long_name": "Synthetic data", "units": ""})
-            gen_da["gen_cond"] = xr.DataArray(cond_data_epoch.astype(out_dtype),
-                                              coords={"t": np.arange(cond_data_epoch.shape[0]),
-                                                      "c": np.arange(cond_data_epoch.shape[1]),
-                                                      "channel": np.array([0])},
-                                              dims=("t", "c", "channel"))
-            xr.Dataset(gen_da).to_netcdf(join(gan_path,
-                                              "gan_gen_patches_{0:04d}_epoch_{1:04d}.nc".format(gan_index, epoch)),
-                                         encoding={"gen_samples": {"zlib": True,
-                                                                   "complevel": 1},
-                                                   "gen_cond": {"zlib": True,
-                                                                "complevel": 1}})
             time_history_index = pd.DatetimeIndex(time_history)
             history = pd.DataFrame(np.hstack([current_epoch, disc_loss_history,
                                               gen_loss_history]),

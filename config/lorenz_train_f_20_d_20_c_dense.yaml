@@ -6,16 +6,16 @@ lorenz:
     c: 10.0
     F: 20.0
     time_step: 0.001
-    num_steps: 1000000
+    num_steps: 20000000
     skip: 5
     burn_in: 2000
-    train_test_split: 0.5
+    train_test_split: 0.1
 gan:
     structure: dense
     t_skip: 5
     x_skip: 1
     output: sample
-    cond_inputs: ["X_t", "Ux_t"]
+    cond_inputs: ["X_t", "U_t"]
     output_cols: ["Ux_t+1"]
     generator:
         num_cond_inputs: 2
@@ -24,7 +24,7 @@ gan:
         num_hidden_layers: 2
         num_hidden_neurons: 16
         activation: selu
-        dropout_alpha: 0.3
+        dropout_alpha: 0.2
         l2_strength: 0.001
         normalize: 0
     discriminator:
@@ -34,27 +34,27 @@ gan:
         num_hidden_layers: 2
         num_hidden_neurons: 16
         l2_strength: 0.001
-        dropout_alpha: 0.1
-    gan_path: ./exp_travis
+        dropout_alpha: 0.2
+    gan_path: /glade/p/work/dgagne/exp_20_dense
     batch_size: 1024
-    gan_index: 0
+    gan_index: 20
     loss: binary_crossentropy
-    learning_rate: 0.0001
-    num_epochs: [10, 12, 14, 16, 18, 20, 30, 40, 50]
+    learning_rate: 0.0002
+    num_epochs: [10, 20, 30, 40, 50]
     metrics: ["accuracy"]
 random_updater:
-    out_file: ./exp_travis/ar1_random_updater.pkl
+    out_file: /glade/p/work/dgagne/exp_20_dense/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: ./exp_travis/u_histogram.pkl
+    out_file: /glade/p/work/dgagne/exp_20_dense/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: ./exp_travis/u_poly.pkl
+    out_file: /glade/p/work/dgagne/exp_20_dense/u_poly.pkl
 poly_add:
     num_terms: 3
-    out_file: ./exp_travis/u_poly_add.pkl
+    out_file: /glade/p/work/dgagne/exp_20_dense/u_poly_add.pkl
 ann_res:
   mean_inputs: 1
   hidden_layers: 2
@@ -66,12 +66,12 @@ ann_res:
   res_loss: mse
   noise_sd: 0.1
   beta_1: 0.9
-  model_path: ./exp_travis
-  dropout_alpha: 0.1
-  num_epochs: 40
+  model_path: /glade/p/work/dgagne/exp_20_dense/
+  dropout_alpha: 0.2
+  num_epochs: 50
   batch_size: 1024
   val_split: 0.5
   verbose: 2
-  model_config: 40
-output_nc_file: ./exp_travis/lorenz_output.nc
-output_csv_file: ./exp_travis/lorenz_combined_output.csv
+  model_config: 20
+output_nc_file: /glade/p/work/dgagne/exp_20_dense/lorenz_output.nc
+output_csv_file: /glade/p/work/dgagne/exp_20_dense/lorenz_combined_output.csv

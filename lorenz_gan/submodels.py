@@ -25,22 +25,14 @@ class SubModelGAN(object):
         self.y_scaling_values = pd.read_csv(self.y_scaling_file, index_col="Channel")
         self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
-    def predict_percentile(self, cond_x, random_x, num_samples=20):
-        norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
-        output = np.zeros((cond_x.shape[0], num_samples))
-        predictions = np.zeros((cond_x.shape[0],))
-        percentiles = norm.cdf(random_x[:, 0]) * 100
-        for s in range(num_samples):
-            output[:, s] = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
-                                            self.y_scaling_values)[:, :, 0].sum(axis=1)
-        for p in range(predictions.size):
-            predictions[p] = np.percentile(output[p], percentiles[p])
-        return predictions
-
     def predict(self, cond_x, random_x):
         norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
         predictions = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, True])[0],
-                                       self.y_scaling_values)[:, :, 0].sum(axis=1)
+                                       self.y_scaling_values)[:, :, 0]
+        if predictions.shape[1] > 1:
+            predictions = predictions.sum(axis=1)
+        else:
+            predictions = predictions.ravel()
         return predictions
 
 
@@ -124,7 +116,7 @@ class SubModelPolyAdd(object):
         self.corr = np.corrcoef(residuals[1:], residuals[:-1])[0, 1]
         self.res_sd = np.std(residuals)
 
-    def predict(self, x, residuals=None):
+    def predict(self, x, residuals=None, predict_residuals=True):
         if residuals is None:
             residuals = np.zeros(x.shape[0])
         x_terms = np.zeros((x.shape[0], self.num_terms))
@@ -134,7 +126,10 @@ class SubModelPolyAdd(object):
         u_res = self.corr * residuals + \
             self.res_sd * np.sqrt(1 - self.corr ** 2) * np.random.normal(size=residuals.shape)
         u_res = u_res.ravel()
-        return u_mean, u_res
+        if predict_residuals:
+            return u_mean, u_res
+        else:
+            return u_mean
 
 
 class SubModelANN(object):
@@ -186,13 +181,16 @@ class SubModelANN(object):
                        verbose=self.config["verbose"])
         self.x_scaling_values.to_csv(self.x_scaling_file, index_label="Channel")
 
-    def predict(self, cond_x, residuals=None):
+    def predict(self, cond_x, residuals=None, predict_residuals=True):
         norm_x = normalize_data(cond_x, scaling_values=self.x_scaling_values)[0]
         sample_predict = K.function([self.model.input, K.learning_phase()], [self.model.output])
         u_mean = sample_predict([norm_x, 0])[0].ravel()
         u_total = sample_predict([norm_x, 1])[0].ravel()
         u_res = u_total - u_mean
-        return u_mean, u_res
+        if predict_residuals:
+            return u_mean, u_res
+        else:
+            return u_mean
 
     def save_model(self, out_path):
         out_config_file = join(out_path, "ann_res_config_{0:04d}_opts.yaml".format(self.config["model_config"]))
@@ -296,11 +294,14 @@ class SubModelANNRes(object):
                            epochs=self.config["num_epochs"],
                            verbose=self.config["verbose"])
 
-    def predict(self, cond_x, residuals):
+    def predict(self, cond_x, residuals, predict_residuals=True):
         norm_x = normalize_data(cond_x, scaling_values=self.x_scaling_values)[0]
         u_mean = self.mean_model.predict(norm_x).ravel()
         u_res = self.res_predict([norm_x, residuals, 1])[0].ravel()
-        return u_mean, u_res
+        if predict_residuals:
+            return u_mean, u_res
+        else:
+            return u_mean
 
     def save_model(self, out_path):
         out_config_file = join(out_path, "annres_config_{0:04d}_opts.yaml".format(self.config["model_config"]))
