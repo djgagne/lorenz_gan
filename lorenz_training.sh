@@ -11,6 +11,5 @@ module unload ncarenv
 source /glade/u/home/dgagne/.bash_profile
 source activate deep
 cd /glade/u/home/dgagne/lorenz_gan
-python -u train_lorenz_gan.py config/lorenz_train_f_20_d_0_c.yaml -g
-python -u train_lorenz_gan.py config/lorenz_train_f_20_d_20_c.yaml -r -g
-python -u train_lorenz_gan.py config/lorenz_train_f_20_d_40_c.yaml -r -g
+#python -u train_lorenz_gan.py config/lorenz_train_f_20_d_0_c_dense.yaml -r -g >& lorenz_train.log
+python -u train_lorenz_gan.py config/lorenz_train_f_20_d_05_c_dense.yaml -r -g >& lorenz_train.log
