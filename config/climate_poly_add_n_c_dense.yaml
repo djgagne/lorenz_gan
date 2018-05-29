@@ -1,0 +1,17 @@
+num_members: 1
+initial_x: []
+F: 20
+u_model_name: poly_add
+u_model_path: /glade/p/work/dgagne/exp_20_noise/u_poly_add.pkl
+random_updater_path: /glade/p/work/dgagne/exp_20_noise/ar1_random_updater.pkl
+num_steps: 2000000
+num_random: 8
+time_step: 0.005
+random_seeds: [5000, 5500]
+initial_step: 2000000
+x_only: 1
+call_param_once: 1
+predict_residuals: 1
+lorenz_nc_file: /glade/p/work/dgagne/exp_20_noise/lorenz_output.nc
+out_path: /glade/p/work/dgagne/exp_20_noise/poly_add_climate/
+num_tf_threads: 8

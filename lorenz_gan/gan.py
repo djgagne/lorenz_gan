@@ -402,7 +402,8 @@ def discriminator_conv(num_cond_inputs=3, num_sample_inputs=32, activation="selu
 
 
 def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1, num_hidden_neurons=8, num_outputs=1,
-                    dropout_alpha=0.2, activation="selu", l2_strength=0.01, normalize=True):
+                    dropout_alpha=0.2, activation="selu", l2_strength=0.01, normalize=True, use_dropout=True,
+                    use_noise=False, noise_sd=0.1):
     """
     Dense conditional generator network. Includes 1 hidden layer.
 
@@ -420,12 +421,15 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1,
     gen_rand_input = Input(shape=(num_random_inputs, ))
     gen_model = concatenate([gen_cond_input, gen_rand_input])
     for h in range(num_hidden_layers):
+        if use_dropout:
+            gen_model = Dropout(dropout_alpha)(gen_model)
+        if use_noise:
+            gen_model = GaussianNoise(noise_sd)(gen_model)
         gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
         if activation == "leaky":
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
-        gen_model = Dropout(dropout_alpha)(gen_model)
     gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
@@ -435,7 +439,8 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1,
 
 
 def discriminator_dense(num_cond_inputs=1, num_sample_inputs=1, num_hidden_neurons=8,
-                        num_hidden_layers=2, activation="selu", l2_strength=0.01, dropout_alpha=0):
+                        num_hidden_layers=2, activation="selu", l2_strength=0.01, dropout_alpha=0,
+                        use_dropout=True, use_noise=True, noise_sd=0.1):
     """
     Dense conditional discriminator network.
 
@@ -455,13 +460,15 @@ def discriminator_dense(num_cond_inputs=1, num_sample_inputs=1, num_hidden_neuro
     disc_sample_flat = Flatten()(disc_sample_input)
     disc_model = concatenate([disc_cond_input, disc_sample_flat])
     for i in range(num_hidden_layers):
+        if use_dropout:
+            disc_model = Dropout(dropout_alpha)(disc_model)
+        if use_noise:
+            disc_model = GaussianNoise(noise_sd)(disc_model)
         disc_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(disc_model)
         if activation == "leaky":
             disc_model = LeakyReLU(0.2)(disc_model)
         else:
             disc_model = Activation(activation)(disc_model)
-        disc_model = Dropout(dropout_alpha)(disc_model)
-        disc_model = GaussianNoise(0.1)(disc_model)
     disc_model = Dense(1, kernel_regularizer=l2(l2_strength))(disc_model)
     disc_model = Activation("sigmoid")(disc_model)
     discriminator = Model([disc_cond_input, disc_sample_input], disc_model)
