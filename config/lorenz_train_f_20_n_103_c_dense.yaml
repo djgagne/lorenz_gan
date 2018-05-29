@@ -39,9 +39,9 @@ gan:
         l2_strength: 0.001
         dropout_alpha: 0
         use_dropout: 0
-        use_noise: 0
-        noise_sd: 0
-    gan_path: /glade/p/work/dgagne/exp_20_noise/
+        use_noise: 1
+        noise_sd: 0.001
+    gan_path: /glade2/work/dgagne/exp_20_noise/
     batch_size: 1024
     gan_index: 103
     loss: binary_crossentropy
@@ -49,18 +49,18 @@ gan:
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
     metrics: ["accuracy"]
 random_updater:
-    out_file: /glade/p/work/dgagne/exp_20_noise/ar1_random_updater.pkl
+    out_file: /glade2/work/dgagne/exp_20_noise/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: /glade/p/work/dgagne/exp_20_noise/u_histogram.pkl
+    out_file: /glade2/work/dgagne/exp_20_noise/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: /glade/p/work/dgagne/exp_20_noise/u_poly.pkl
+    out_file: /glade2/work/dgagne/exp_20_noise/u_poly.pkl
 poly_add:
     num_terms: 3
-    out_file: /glade/p/work/dgagne/exp_20_noise/u_poly_add.pkl
+    out_file: /glade2/work/dgagne/exp_20_noise/u_poly_add.pkl
 ann_res:
   mean_inputs: 1
   hidden_layers: 2
@@ -72,12 +72,12 @@ ann_res:
   res_loss: mse
   noise_sd: 0.1
   beta_1: 0.9
-  model_path: /glade/p/work/dgagne/exp_20_noise/
+  model_path: /glade2/work/dgagne/exp_20_noise/
   dropout_alpha: 0
   num_epochs: 50
   batch_size: 1024
   val_split: 0.5
   verbose: 2
   model_config: 0
-output_nc_file: /glade/p/work/dgagne/exp_20_noise/lorenz_output.nc
-output_csv_file: /glade/p/work/dgagne/exp_20_noise/lorenz_combined_output.csv
+output_nc_file: /glade2/work/dgagne/exp_20_noise/lorenz_output.nc
+output_csv_file: /glade2/work/dgagne/exp_20_noise/lorenz_combined_output.csv

@@ -9,9 +9,9 @@ before_install:
   - export PATH=/home/travis/miniconda/bin:$PATH
   - conda update --yes --quiet conda
 install:
-  - conda create -n testenv --yes -c conda-forge python=$PYTHON_VERSION pip numpy scipy matplotlib
+  - conda create -n testenv --yes -q -c conda-forge python=$PYTHON_VERSION pip numpy scipy matplotlib
   - source activate testenv
-  - conda install --yes -c conda-forge scikit-learn scikit-image netcdf4 xarray numba
+  - conda install --yes -q -c conda-forge scikit-learn scikit-image netcdf4 xarray numba
   - pip install pyyaml
   - pip install tensorflow
   - pip install keras

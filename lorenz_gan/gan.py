@@ -615,10 +615,11 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
                                                                   batch_labels))
             gen_loss_history.append(gen_disc.train_on_batch([gen_cond_data_batch, gen_batch_vec],
                                                             gen_labels))
-            print("Epoch {0:02d}, Batch {1:04d}, Disc Loss: {2:0.4f}, Gen Loss: {3:0.4f}".format(epoch,
-                                                                                                 b,
-                                                                                                 disc_loss_history[-1][0],
-                                                                                                 gen_loss_history[-1][0]))
+            if b % 20 == 0:
+                print("Epoch {0:02d}, Batch {1:04d}, Disc Loss: {2:0.4f}, Gen Loss: {3:0.4f}".format(epoch,
+                                                                                                     b,
+                                                                                                     disc_loss_history[-1][0],
+                                                                                                     gen_loss_history[-1][0]))
             time_history.append(pd.Timestamp("now"))
             current_epoch.append((epoch, b))
         if epoch in num_epochs:
