@@ -11,7 +11,7 @@ lorenz:
     burn_in: 2000
     train_test_split: 0.9
 gan:
-    structure: dense
+    structure: specified_random
     t_skip: 5
     x_skip: 1
     output: sample
@@ -21,13 +21,10 @@ gan:
         num_cond_inputs: 2
         num_random_inputs: 1
         num_outputs: 1
-        num_hidden_layers: 2
         num_hidden_neurons: 16
         activation: selu
-        dropout_alpha: 0.3
         l2_strength: 0.001
         use_dropout: 0
-        use_noise: 1
         noise_sd: 0.01
         normalize: 1
     discriminator:
@@ -61,23 +58,5 @@ poly:
 poly_add:
     num_terms: 3
     out_file: ./exp_travis/u_poly_add.pkl
-ann_res:
-  mean_inputs: 1
-  hidden_layers: 2
-  hidden_neurons: 16
-  activation: selu
-  l2_weight: 0.001
-  learning_rate: 0.001
-  mean_loss: mse
-  res_loss: mse
-  noise_sd: 0.1
-  beta_1: 0.9
-  model_path: ./exp_travis
-  dropout_alpha: 0.1
-  num_epochs: 40
-  batch_size: 1024
-  val_split: 0.5
-  verbose: 2
-  model_config: 40
 output_nc_file: ./exp_travis/lorenz_output.nc
 output_csv_file: ./exp_travis/lorenz_combined_output.csv

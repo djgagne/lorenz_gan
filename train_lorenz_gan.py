@@ -1,5 +1,5 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
-from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
+from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense, generator_dense_stoch
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
 import xarray as xr
@@ -181,12 +181,21 @@ def train_lorenz_gan(config, combined_data):
     if config["gan"]["structure"] == "dense":
         gen_model = generator_dense(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
+        rand_vec_length = config["gan"]["generator"]["num_random_inputs"]
+    elif config["gan"]["structure"] == "specified_random":
+        gen_model = generator_dense_stoch(**config["gan"]["generator"])
+        disc_model = discriminator_dense(**config["gan"]["discriminator"])
+        rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
+                          config["gan"]["generator"]["num_hidden_neurons"]
     elif config["gan"]["structure"] == "concrete":
         gen_model = generator_conv_concrete(**config["gan"]["generator"])
         disc_model = discriminator_conv_concrete(**config["gan"]["discriminator"])
+        rand_vec_length = config["gan"]["generator"]["num_random_inputs"]
+
     else:
         gen_model = generator_conv(**config["gan"]["generator"])
         disc_model = discriminator_conv(**config["gan"]["discriminator"])
+        rand_vec_length = config["gan"]["generator"]["num_random_inputs"]
     optimizer = Adam(lr=config["gan"]["learning_rate"], beta_1=0.5, beta_2=0.9)
     loss = config["gan"]["loss"]
     gen_disc = initialize_gan(gen_model, disc_model, loss, optimizer, config["gan"]["metrics"])
@@ -194,7 +203,7 @@ def train_lorenz_gan(config, combined_data):
         Y_norm = Y_norm[:-trim]
         X_norm = X_norm[:-trim]
     train_gan(np.expand_dims(Y_norm, -1), X_norm, gen_model, disc_model, gen_disc, config["gan"]["batch_size"],
-              config["gan"]["generator"]["num_random_inputs"], config["gan"]["gan_path"],
+              rand_vec_length, config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"])
 
 

@@ -8,4 +8,16 @@ if __name__ == "__main__":
           author_email="dgagne@ucar.edu",
           license="MIT",
           url="https://github.com/djgagne/lorenz_gan",
-          packages=["lorenz_gan"])
+          packages=["lorenz_gan"],
+          install_requires=["numpy",
+                            "scipy",
+                            "matplotlib",
+                            "xarray",
+                            "netcdf4",
+                            "tensorflow",
+                            "keras",
+                            "numba",
+                            "pandas",
+                            "jupyter",
+                            "scikit-learn",
+                            "pyyaml"])

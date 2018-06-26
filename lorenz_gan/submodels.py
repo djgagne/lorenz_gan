@@ -7,7 +7,7 @@ import numpy as np
 from os.path import join, exists
 import pandas as pd
 from scipy.stats import rv_histogram, norm
-from lorenz_gan.gan import Interpolate1D, unnormalize_data, normalize_data, ConcreteDropout
+from lorenz_gan.gan import Interpolate1D, unnormalize_data, normalize_data, ConcreteDropout, Split1D, Scale
 from sklearn.linear_model import LinearRegression
 import yaml
 
@@ -18,7 +18,9 @@ class SubModelGAN(object):
         self.model_path_start = "/".join(model_path.split("/")[:-1])
         self.model_config = model_path.split("/")[-1].split("_")[2]
         self.model = load_model(self.model_path, custom_objects={"Interpolate1D": Interpolate1D,
-                                                                 "ConcreteDropout": ConcreteDropout})
+                                                                 "ConcreteDropout": ConcreteDropout,
+                                                                 "Split1D": Split1D,
+                                                                 "Scale": Scale})
         self.pred_func = K.function(self.model.input + [K.learning_phase()], [self.model.output])
         self.x_scaling_file = join(self.model_path_start, "gan_X_scaling_values_{0}.csv".format(self.model_config))
         self.y_scaling_file = join(self.model_path_start, "gan_Y_scaling_values_{0}.csv".format(self.model_config))
@@ -130,6 +132,18 @@ class SubModelPolyAdd(object):
             return u_mean, u_res
         else:
             return u_mean
+
+    def predict_mean(self, x):
+        x_terms = np.zeros((x.shape[0], self.num_terms))
+        for p in range(1, self.num_terms + 1):
+            x_terms[:, p - 1] = x[:, 0] ** p
+        return self.model.predict(x_terms).ravel()
+
+    def predict_res(self, residuals):
+        u_res = self.corr * residuals + \
+                self.res_sd * np.sqrt(1 - self.corr ** 2) * np.random.normal(size=residuals.shape)
+        u_res = u_res.ravel()
+        return u_res
 
 
 class SubModelANN(object):

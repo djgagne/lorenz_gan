@@ -1,10 +1,9 @@
-from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, AlphaDropout
+from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, Add
 from keras.layers import Conv1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
 from keras.layers import GaussianNoise
 from keras.initializers import RandomUniform
 import keras.backend as K
 from keras.optimizers import Adam
-import xarray as xr
 from scipy.stats import expon
 from keras.models import Model
 import numpy as np
@@ -12,7 +11,7 @@ import pandas as pd
 from os.path import join
 from keras.regularizers import l2
 from keras.engine import InputSpec
-from keras.layers import Dense, Wrapper
+from keras.layers import Dense, Wrapper, Lambda
 
 
 class Interpolate1D(Layer):
@@ -40,6 +39,41 @@ class Interpolate1D(Layer):
         output = K.concatenate(combined_values, axis=1)
         return output
 
+
+class Split1D(Layer):
+    def __init__(self, start=0, stop=1, **kwargs):
+        assert stop > start
+        self.start = start
+        self.stop = stop
+        super(Split1D, self).__init__(**kwargs)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape[0], self.stop - self.start
+
+    def call(self, inputs, **kwargs):
+        return inputs[:, self.start: self.stop]
+
+    def get_config(self):
+        config = {'start': self.start, "stop": self.stop}
+        base_config = super(Split1D, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+
+class Scale(Layer):
+    def __init__(self, scale_factor=1, **kwargs):
+        self.scale_factor = scale_factor
+        super(Scale, self).__init__(**kwargs)
+
+    def compute_output_shape(self, input_shape):
+        return input_shape
+
+    def call(self, inputs, **kwargs):
+        return K.tf.scalar_mul(K.constant(self.scale_factor), inputs)
+
+    def get_config(self):
+        config = {'scale_factor': self.scale_factor}
+        base_config = super(Scale, self).get_config()
+        return dict(list(base_config.items()) + list(config.items()))
 
 class ConcreteDropout(Wrapper):
     """This wrapper allows to learn the dropout probability for any given input layer.
@@ -151,6 +185,10 @@ class ConcreteDropout(Wrapper):
             return K.in_train_phase(relaxed_dropped_inputs,
                                     self.layer.call(inputs),
                                     training=training)
+
+
+def split_1d(input_tensor, start=0, stop=1):
+    return input_tensor[start: stop]
 
 
 def predict_stochastic(neural_net):
@@ -430,6 +468,46 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1,
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
+    gen_model = Reshape((num_outputs, 1))(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
+    generator = Model([gen_cond_input, gen_rand_input], gen_model)
+    return generator
+
+
+def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neurons=8,
+                          num_outputs=1, activation="selu", l2_strength=0.01, normalize=True, noise_sd=0.01,
+                          **kwargs):
+    """
+    Dense conditional generator network. Includes 2 hidden layers.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_random_inputs (int): Size of the random input vector.
+        num_outputs (int): Number of output neurons
+        activation (str): Activation function for the hidden layer.
+
+    Returns:
+        Generator Keras Model object.
+    """
+    gen_cond_input = Input(shape=(num_cond_inputs, ))
+    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons, ))
+    gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
+    gen_rand_hidden = Split1D(start=num_random_inputs, stop=num_hidden_neurons + num_random_inputs)(gen_rand_input)
+    gen_rand_hidden = Scale(noise_sd)(gen_rand_hidden)
+    gen_model = concatenate([gen_cond_input, gen_rand_in])
+    gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
+    gen_model = Add()([gen_model, gen_rand_hidden])
+    gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
     gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:

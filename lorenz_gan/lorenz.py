@@ -3,7 +3,7 @@ from numba import jit
 import matplotlib.pyplot as plt
 import xarray as xr
 import pandas as pd
-
+from scipy.integrate import solve_ivp
 
 @jit(nopython=True, cache=True)
 def l96_truth_step(X, Y, h, F, b, c):
@@ -105,7 +105,7 @@ def run_lorenz96_truth(x_initial, y_initial, h, f, b, c, time_step, num_steps, b
 
 
 @jit(nopython=True, cache=True)
-def l96_forecast_step(X, F):
+def l96_forecast_step(X, F=20):
     """
     Calculate the tendency of the Lorenz 96 Forecast Model dynamics
 
@@ -125,7 +125,7 @@ def l96_forecast_step(X, F):
 
 def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_steps,
                           num_random, time_step=0.005, x_only=True,
-                          predict_residuals=False, rs=None):
+                          predict_residuals=False, order=2, rs=None):
     """
     Integrate the Lorenz 96 forecast model forward in time from a specified initial state with
     a parameterized subgrid forcing model. The u_model should contain a predict method that
@@ -141,13 +141,16 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
         time_step (float): Size of the integration time step in MTUs
         x_only (bool): Pass only the x information into the parameterization if True
         predict_residuals (bool): Predict the residuals of the mean sub-grid state or not
+        order (int): 2 or 4 depending on if 2nd or 4th order Runge-Kutta is used.
         rs (RandomState): RandomState object used to generate random numbers
 
     Returns:
         output: xarray Dataset containing X and U values
     """
-    order = 4
-    time_inc = np.array([0.5, 0.5, 1])
+    if order == 4:
+        time_inc = np.array([0.5, 0.5, 1])
+    else:
+        time_inc = np.array([0.5, 1])
     steps = np.arange(num_steps)
     times = steps * time_step
     x_u_curr = np.zeros((3, x_initial.shape[0]))
@@ -172,34 +175,54 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
         else:
             random_values = rs.normal(size=(x_initial.size, num_random))
         U_res_out[0] = random_values[:, 0]
+    else:
+        random_values = np.random.normal(size=(x_initial.size, num_random))
     for n in range(1, num_steps):
         if n % 400 == 0:
-            print(n, x_u_curr[0])
-        if predict_residuals:
-            if x_only:
-                x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr[0:1].T, x_u_curr[2:3].T)
-            else:
-                x_u_curr[1], x_u_curr[2] = u_model.predict(x_u_curr.T, x_u_curr[2:3].T)
-            U_out[n] = x_u_curr[1] + x_u_curr[2]
-            U_res_out[n] = x_u_curr[2]
-        else:
-            if x_only:
-                x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
-            else:
-                x_u_curr[1] = u_model.predict(x_u_curr[0:2].T, random_values)
-            U_out[n] = x_u_curr[1]
-            U_res_out[n] = random_values[:, 0]
+            print(n, x_u_curr[0], x_u_curr[1], x_u_curr[2])
+
         for o in range(order):
+            if predict_residuals:
+                if x_only:
+                    x_u_curr[1] = u_model.predict_mean(x_u_curr[0:1].T)
+                else:
+                    x_u_curr[1] = u_model.predict_mean(x_u_curr.T, x_u_curr[2:3].T)
+            else:
+                if x_only:
+                    x_u_curr[1] = u_model.predict(x_u_curr[0:1].T, random_values)
+                else:
+                    x_u_curr[1] = u_model.predict(x_u_curr[0:2].T, random_values)
+                U_out[n] = x_u_curr[1]
+                U_res_out[n] = random_values[:, 0]
             k_dXdt[o] = l96_forecast_step(x_u_curr[0], f) - x_u_curr[1] + x_u_curr[2]
             if o < order - 1:
                 x_u_curr[0] = X_out[n - 1] + k_dXdt[o] * time_inc[o] * time_step
-        x_u_curr[0] = X_out[n - 1] + (k_dXdt[0] + 2 * k_dXdt[1] + 2 * k_dXdt[2] + k_dXdt[3]) / 6 * time_step
+        if order == 4:
+            x_u_curr[0] = X_out[n - 1] + (k_dXdt[0] + 2 * k_dXdt[1] + 2 * k_dXdt[2] + k_dXdt[3]) / 6 * time_step
+        else:
+            x_u_curr[0] = X_out[n - 1] + k_dXdt[1] * time_step
         X_out[n] = x_u_curr[0]
-        if not predict_residuals:
+        U_out[n] = x_u_curr[1] + x_u_curr[2]
+        if predict_residuals:
+            U_res_out[n] = x_u_curr[2]
+            x_u_curr[2] = u_model.predict_res(x_u_curr[2])
+        else:
             random_values = random_updater.update(random_values)
     output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, u_res=U_res_out, time=times),
                         coords=coords)
     return output
+
+
+def lorenz_96_forecast_step_ivp(time, x_input, f=20, time_step=0.005, parameterization=None, random_updater=None):
+    K = x_input.size
+    dXdt = np.zeros(x_input.size)
+    for k in range(K):
+        dXdt[k] = -x_input[k - 1] * (x_input[k - 2] - x_input[(k + 1) % K]) - x_input[k] + f
+    if hasattr(parameterization, "predict_mean"):
+        dXdt -= parameterization.predict_mean(x_input.reshape(-1, 1))
+    else:
+        dXdt -= parameterization.predict(x_input.reshape(-1, 1))
+    return dXdt
 
 
 def process_lorenz_data(X_out, Y_out, times, steps, J, F, dt, x_skip, t_skip, u_scale):
