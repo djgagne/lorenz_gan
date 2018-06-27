@@ -15,19 +15,19 @@ gan:
     t_skip: 5
     x_skip: 1
     output: sample
-    cond_inputs: ["X_t", "Ux_t"]
+    cond_inputs: ["X_t"]
     output_cols: ["Ux_t+1"]
     generator:
-        num_cond_inputs: 2
+        num_cond_inputs: 1
         num_random_inputs: 1
         num_outputs: 1
         num_hidden_neurons: 16
         activation: selu
-        noise_sd: 0.1
+        noise_sd: 0.001
         l2_strength: 0.001
         normalize: 1
     discriminator:
-        num_cond_inputs: 2
+        num_cond_inputs: 1
         num_sample_inputs: 1
         activation: selu
         num_hidden_layers: 2
@@ -36,10 +36,10 @@ gan:
         dropout_alpha: 0
         use_dropout: 0
         use_noise: 1
-        noise_sd: 0.1
+        noise_sd: 0.001
     gan_path: /glade2/work/dgagne/exp_20_stoch/
     batch_size: 1024
-    gan_index: 101
+    gan_index: 103
     loss: binary_crossentropy
     learning_rate: 0.0001
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30]
@@ -57,23 +57,5 @@ poly:
 poly_add:
     num_terms: 3
     out_file: /glade2/work/dgagne/exp_20_stoch/u_poly_add.pkl
-ann_res:
-  mean_inputs: 1
-  hidden_layers: 2
-  hidden_neurons: 16
-  activation: selu
-  l2_weight: 0.001
-  learning_rate: 0.001
-  mean_loss: mse
-  res_loss: mse
-  noise_sd: 0.1
-  beta_1: 0.9
-  model_path: /glade2/work/dgagne/exp_20_stoch/
-  dropout_alpha: 0
-  num_epochs: 50
-  batch_size: 1024
-  val_split: 0.5
-  verbose: 2
-  model_config: 0
 output_nc_file: /glade2/work/dgagne/exp_20_stoch/lorenz_output.nc
 output_csv_file: /glade2/work/dgagne/exp_20_stoch/lorenz_combined_output.csv
