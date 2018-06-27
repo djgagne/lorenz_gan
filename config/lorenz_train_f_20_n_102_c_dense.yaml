@@ -43,7 +43,7 @@ gan:
         noise_sd: 0.01
     gan_path: /glade2/work/dgagne/exp_20_noise/
     batch_size: 1024
-    gan_index: 103
+    gan_index: 102
     loss: binary_crossentropy
     learning_rate: 0.0001
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40]
