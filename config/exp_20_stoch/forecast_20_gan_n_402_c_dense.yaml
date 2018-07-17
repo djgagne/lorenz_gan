@@ -10,7 +10,7 @@ time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 15000]
 initial_step: [3000000, 18000000, 20000]
-x_only: 0
+x_only: 1
 call_param_once: 1
 predict_residuals: 0
 max_tasks: 1000
