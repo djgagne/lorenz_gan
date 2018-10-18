@@ -1,6 +1,7 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
-from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense, generator_dense_stoch
-from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, discriminator_conv_concrete
+from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
+from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete
+from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
 import xarray as xr
 import keras.backend as K
@@ -12,7 +13,7 @@ import yaml
 import argparse
 from os.path import exists, join
 from os import mkdir
-
+import matplotlib.pyplot as plt
 
 def main():
     """
@@ -77,6 +78,8 @@ def main():
     u_scale = config["lorenz"]["h"] * config["lorenz"]["c"] / config["lorenz"]["b"]
     saved_steps = (config["lorenz"]["num_steps"] - config["lorenz"]["burn_in"]) // config["lorenz"]["skip"]
     split_step = int(config["lorenz"]["train_test_split"] * saved_steps)
+    #val_split_step = int(config["lorenz"]["val_split"] * saved_steps)
+
     if args.reload:
         print("Reloading csv data")
         combined_data = pd.read_csv(config["output_csv_file"])
@@ -107,8 +110,17 @@ def main():
     train_poly(combined_data["X_t"].values, u_vals, **config["poly"])
     x_time_series = X_out[:split_step-1, 0:1]
     u_time_series = (-X_out[:split_step-1, -1] * (X_out[:split_step-1, -2] - X_out[:split_step-1, 1])
-                     - X_out[:split_step-1, 0] + config["lorenz"]["F"]) - (X_out[1:split_step, 0] - X_out[:split_step-1, 0]) / config["lorenz"]["time_step"] / config["lorenz"]["skip"]
+                     - X_out[:split_step-1, 0] + config["lorenz"]["F"]) \
+        - (X_out[1:split_step, 0] - X_out[:split_step-1, 0]) / config["lorenz"]["time_step"] / config["lorenz"]["skip"]
+    #x_val_time_series = X_out[split_step:val_split_step - 1, 0:1]
+    #u_val_time_series = (-X_out[split_step:val_split_step - 1, -1] * (X_out[split_step:val_split_step - 1, -2] - X_out[split_step:val_split_step - 1, 1])
+    #                 - X_out[split_step:val_split_step - 1, 0] + config["lorenz"]["F"]) \
+    #                - (X_out[split_step + 1:val_split_step, 0] - X_out[split_step:val_split_step - 1, 0]) / config["lorenz"]["time_step"] / \
+    #                config["lorenz"]["skip"]
+    combined_time_series = pd.DataFrame({"X_t": x_time_series[1:].ravel(), "Ux_t": u_time_series[:-1],
+                                         "Ux_t+1": u_time_series[1:]}, columns=["X_t", "Ux_t", "Ux_t+1"])
     print(u_time_series.min(), u_time_series.max(), u_time_series.mean())
+    combined_time_series.to_csv(config["output_csv_file"].replace(".csv", "_ts_val.csv"))
     if "poly_add" in config.keys():
         train_poly_add(x_time_series,
                        u_time_series,
@@ -118,7 +130,7 @@ def main():
                       u_time_series,
                       config["ann_res"])
     if args.gan:
-        train_lorenz_gan(config, combined_data)
+        train_lorenz_gan(config, combined_data, combined_time_series)
     return
 
 
@@ -144,7 +156,7 @@ def generate_lorenz_data(config):
     return x_out, y_out, times, steps
 
 
-def train_lorenz_gan(config, combined_data):
+def train_lorenz_gan(config, combined_data, combined_time_series):
     """
     Train GAN on Lorenz data
 
@@ -205,11 +217,24 @@ def train_lorenz_gan(config, combined_data):
     train_gan(np.expand_dims(Y_norm, -1), X_norm, gen_model, disc_model, gen_disc, config["gan"]["batch_size"],
               rand_vec_length, config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"])
+    gen_pred_func = predict_stochastic(gen_model)
+    gen_ts_preds = gen_pred_func([combined_time_series[x_cols],
+                                  np.zeros((combined_time_series.shape[0],
+                                            rand_vec_length))])[0]
+    gen_ts_residuals = combined_time_series[y_cols].values.ravel() - gen_ts_preds.ravel()
+    print(gen_ts_residuals.max(), gen_ts_residuals.mean(), gen_ts_residuals.min(), np.abs(gen_ts_residuals).mean())
+    plt.plot(gen_ts_residuals)
+    plt.show()
+    train_random_updater(gen_ts_residuals,
+                         config["random_updater"]["out_file"].replace(".pkl",
+                                                                      "_{0:03d}.pkl".format(config["gan"]["gan_index"])))
 
 
 def train_random_updater(data, out_file):
     random_updater = AR1RandomUpdater()
     random_updater.fit(data)
+    print("AR1 Corr:", random_updater.corr)
+    print("AR1 Noise SD:", random_updater.noise_sd)
     with open(out_file, "wb") as out_file_obj:
         pickle.dump(random_updater, out_file_obj, pickle.HIGHEST_PROTOCOL)
 

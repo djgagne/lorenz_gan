@@ -6,57 +6,56 @@ lorenz:
     c: 10.0
     F: 20.0
     time_step: 0.001
-    num_steps: 2000000
+    num_steps: 20000000
     skip: 5
     burn_in: 2000
-    train_test_split: 0.4
+    train_test_split: 0.1
 gan:
     structure: specified_random
     t_skip: 5
     x_skip: 1
     output: sample
-    cond_inputs: ["X_t", "Ux_t"]
+    cond_inputs: ["X_t"]
     output_cols: ["Ux_t+1"]
     generator:
-        num_cond_inputs: 2
+        num_cond_inputs: 1
         num_random_inputs: 1
         num_outputs: 1
         num_hidden_neurons: 16
         activation: selu
+        noise_sd: 0.001
         l2_strength: 0.001
-        use_dropout: 0
-        noise_sd: 0.01
         normalize: 1
     discriminator:
-        num_cond_inputs: 2
+        num_cond_inputs: 1
         num_sample_inputs: 1
         activation: selu
         num_hidden_layers: 2
         num_hidden_neurons: 16
         l2_strength: 0.001
+        dropout_alpha: 0
         use_dropout: 0
-        dropout_alpha: 0.0
         use_noise: 1
-        noise_sd: 0.01
-    gan_path: ./exp_travis
+        noise_sd: 0.001
+    gan_path: /glade/work/dgagne/exp_20_stoch/
     batch_size: 1024
-    gan_index: 0
+    gan_index: 603
     loss: binary_crossentropy
     learning_rate: 0.0001
-    num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]
+    num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30]
     metrics: ["accuracy"]
 random_updater:
-    out_file: ./exp_travis/ar1_random_updater.pkl
+    out_file: /glade/work/dgagne/exp_20_stoch/ar1_random_updater_603.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
-    out_file: ./exp_travis/u_histogram.pkl
+    out_file: /glade/work/dgagne/exp_20_stoch/u_histogram.pkl
 poly:
     num_terms: 3
     noise_type: additive
-    out_file: ./exp_travis/u_poly.pkl
+    out_file: /glade/work/dgagne/exp_20_stoch/u_poly.pkl
 poly_add:
     num_terms: 3
-    out_file: ./exp_travis/u_poly_add.pkl
-output_nc_file: ./exp_travis/lorenz_output.nc
-output_csv_file: ./exp_travis/lorenz_combined_output.csv
+    out_file: /glade/work/dgagne/exp_20_stoch/u_poly_add.pkl
+output_nc_file: /glade/work/dgagne/exp_20_stoch/lorenz_output.nc
+output_csv_file: /glade/work/dgagne/exp_20_stoch/lorenz_combined_output.csv

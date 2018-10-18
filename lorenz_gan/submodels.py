@@ -117,6 +117,8 @@ class SubModelPolyAdd(object):
         residuals = u - u_mean
         self.corr = np.corrcoef(residuals[1:], residuals[:-1])[0, 1]
         self.res_sd = np.std(residuals)
+        print("Poly Add Corr:", self.corr)
+        print("Poly Add Res SD:", self.res_sd)
 
     def predict(self, x, residuals=None, predict_residuals=True):
         if residuals is None:
