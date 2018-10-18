@@ -13,7 +13,7 @@ import yaml
 import argparse
 from os.path import exists, join
 from os import mkdir
-import matplotlib.pyplot as plt
+
 
 def main():
     """
@@ -222,9 +222,6 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
                                   np.zeros((combined_time_series.shape[0],
                                             rand_vec_length))])[0]
     gen_ts_residuals = combined_time_series[y_cols].values.ravel() - gen_ts_preds.ravel()
-    print(gen_ts_residuals.max(), gen_ts_residuals.mean(), gen_ts_residuals.min(), np.abs(gen_ts_residuals).mean())
-    plt.plot(gen_ts_residuals)
-    plt.show()
     train_random_updater(gen_ts_residuals,
                          config["random_updater"]["out_file"].replace(".pkl",
                                                                       "_{0:03d}.pkl".format(config["gan"]["gan_index"])))
