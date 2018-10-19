@@ -224,7 +224,7 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
     gen_ts_residuals = combined_time_series[y_cols].values.ravel() - gen_ts_preds.ravel()
     train_random_updater(gen_ts_residuals,
                          config["random_updater"]["out_file"].replace(".pkl",
-                                                                      "_{0:03d}.pkl".format(config["gan"]["gan_index"])))
+                                                                      "_{0:04d}.pkl".format(config["gan"]["gan_index"])))
 
 
 def train_random_updater(data, out_file):
