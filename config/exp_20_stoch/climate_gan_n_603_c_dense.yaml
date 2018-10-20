@@ -2,15 +2,15 @@ num_members: 1
 initial_x: []
 F: 20
 u_model_name: gan
-u_model_path: /glade/work/dgagne/exp_20_stoch/gan_generator_0503_epoch_0030.h5
-random_updater_path: /glade/work/dgagne/exp_20_stoch/ar1_random_updater_0503.pkl
+u_model_path: /glade/work/dgagne/exp_20_stoch/gan_generator_0603_epoch_0030.h5
+random_updater_path: /glade/work/dgagne/exp_20_stoch/ar1_random_updater_0603.pkl
 num_steps: 2000000
 num_random: 17
 time_step: 0.005
 random_seeds: [5000, 5500]
 initial_step: 2000000
-x_only: 0
+x_only: 1
 predict_residuals: 0
 lorenz_nc_file: /glade/work/dgagne/exp_20_stoch/lorenz_output.nc
-out_path: /glade/work/dgagne/exp_20_stoch/gan_503_climate/
+out_path: /glade/work/dgagne/exp_20_stoch/gan_603_climate/
 num_tf_threads: 8

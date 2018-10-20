@@ -45,7 +45,7 @@ gan:
     num_epochs: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30]
     metrics: ["accuracy"]
 random_updater:
-    out_file: /glade/work/dgagne/exp_20_stoch/ar1_random_updater_502.pkl
+    out_file: /glade/work/dgagne/exp_20_stoch/ar1_random_updater.pkl
 histogram:
     num_x_bins: 30
     num_u_bins: 30
