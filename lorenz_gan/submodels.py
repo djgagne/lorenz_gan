@@ -37,6 +37,26 @@ class SubModelGAN(object):
             predictions = predictions.ravel()
         return predictions
 
+    def predict_batch(self, cond_x, random_x, batch_size=8, stochastic=1):
+        norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
+        batch_indices = np.arange(0, norm_x.shape[0], batch_size, dtype=np.int32)
+        batch_indices = np.append(batch_indices, norm_x.shape[0])
+        predictions = np.zeros((norm_x.shape[0], self.model.output.shape[1].value))
+        for b, batch_index in enumerate(batch_indices[:-1]):
+            predictions[batch_index:
+                        batch_indices[b + 1]] = unnormalize_data(self.pred_func([norm_x[batch_index:
+                                                                                        batch_indices[b + 1],
+                                                                                        :, 0],
+                                                                                 random_x[batch_index:
+                                                                                          batch_indices[b + 1]],
+                                                                                 stochastic])[0],
+                                                                 self.y_scaling_values)[:, :, 0]
+        if predictions.shape[1] > 1:
+            predictions = predictions.sum(axis=1)
+        else:
+            predictions = predictions.ravel()
+        return predictions
+
 
 class SubModelHist(object):
     def __init__(self, num_x_bins=20, num_u_bins=20):
