@@ -1,8 +1,8 @@
 data_file: "/glade/work/dgagne/exp_20_stoch/lorenz_combined_output_test_small.csv"
 gan_path: "/glade/work/dgagne/exp_20_stoch/"
-gan_indices: [0, 100, 101, 102, 103, 202, 203, 500, 501, 502, 503, 602, 603]
+gan_indices: [100, 101, 102, 103, 202, 203, 500, 501, 502, 503, 602, 603]
 out_path: "/glade/work/dgagne/exp_20_stoch/offline/"
 seed: 23904
-batch_size: 1024
+batch_size: 262144
 meta_columns: ["x_index", "time", "step"]
 

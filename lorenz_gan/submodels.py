@@ -42,6 +42,7 @@ class SubModelGAN(object):
         batch_indices = np.arange(0, norm_x.shape[0], batch_size, dtype=np.int32)
         batch_indices = np.append(batch_indices, norm_x.shape[0])
         predictions = np.zeros((norm_x.shape[0], self.model.output.shape[1].value))
+        print("Start batches", cond_x.shape[0])
         for b, batch_index in enumerate(batch_indices[:-1]):
             predictions[batch_index:
                         batch_indices[b + 1]] = unnormalize_data(self.pred_func([norm_x[batch_index:
@@ -51,6 +52,7 @@ class SubModelGAN(object):
                                                                                           batch_indices[b + 1]],
                                                                                  stochastic])[0],
                                                                  self.y_scaling_values)[:, :, 0]
+        print("End batches", cond_x.shape[0])
         if predictions.shape[1] > 1:
             predictions = predictions.sum(axis=1)
         else:
@@ -91,10 +93,10 @@ class AR1RandomUpdater(object):
         self.corr = np.corrcoef(data[:-1], data[1:])[0, 1]
         self.noise_sd = np.sqrt(1 - self.corr ** 2)
 
-    def update(self, random_values, rs=None):
-        return self.corr * random_values + norm.rvs(size=random_values.shape,
-                                                    loc=0, scale=self.noise_sd, 
-                                                    random_state=rs)
+    def update(self, random_values, rs=np.random.RandomState(3232)):
+        return self.corr * random_values + rs.normal(size=random_values.shape,
+                                                    loc=0, scale=self.noise_sd)
+                                            
 
 
 class SubModelPoly(object):
