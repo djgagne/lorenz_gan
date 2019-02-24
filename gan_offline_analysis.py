@@ -4,6 +4,7 @@ from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 import traceback
+from os.path import join
 
 def main():
     parser = argparse.ArgumentParser()
@@ -40,25 +41,25 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
         for p_type in gan_preds.keys():
             pd.merge(data[meta_columns], gan_preds[p_type], left_index=True, right_index=True).to_csv(
                 join(out_dir, "gan_{0:03d}_{1}_offline_predictions.csv".format(gan_index, p_type)), index_label="Index")
-        gan_noise.to_csv(join(out_dir, "gan_{0:03d}_noise_corr.csv".format(gan_index)))
+        gan_noise.to_csv(join(out_dir, "gan_{0:03d}_noise_corr.csv".format(gan_index)), index_label="Model")
         pdf_columns = ["truth"]
         for key in gan_preds.keys():
             pdf_columns += [key + "_" + x for x in gan_preds[key].columns]
         pdfs = pd.DataFrame(0.0, index=pdf_bins, columns=pdf_columns, dtype=np.float32)
         print("Calc PDFs of GAN predictions {0:03d}".format(gan_index))
-        pdfs.loc[:, "truth"] = calc_pdf_kde(data["Ux_t+1"], pdf_bins, bandwidth=bandwidth)
-        pdfs.to_csv(join(out_dir, "gan_{0:03d}_offline_pdfs.csv".format(gan_index)), index_label="Bins")
+        pdfs.loc[:, "truth"] = calc_pdf_kde(data["Ux_t+1"].values, pdf_bins, bandwidth=bandwidth)
         for key in gan_preds.keys():
             for col in gan_preds[key].columns:
-                pdfs.loc[:, key + "_" + col] = calc_pdf_kde(gan_preds[key][col], pdf_bins, bandwidth=bandwidth)
+                pdfs.loc[:, key + "_" + col] = calc_pdf_kde(gan_preds[key][col].values, pdf_bins, bandwidth=bandwidth)
+        pdfs.to_csv(join(out_dir, "gan_{0:03d}_offline_pdfs.csv".format(gan_index)), index_label="Bins")
         print("Calc Hellingers of GAN predictions {0:03d}".format(gan_index))
         hellingers = pd.DataFrame(0.0, index=epochs,
                                 columns=["{0:04d}_{1}".format(gan_index, k) for k in gan_preds.keys()],
                                 dtype=np.float32)
         for key in gan_preds.keys():
             for c, col in enumerate(gan_preds[key].columns):
-                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdfs["truth"],
-                                                                                            pdfs[key + "_" + col])
+                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdfs["truth"].values,
+                                                                                            pdfs[key + "_" + col].values)
         hellingers.to_csv(join(out_dir, "gan_{0:03d}_offline_hellinger.csv".format(gan_index)), index_label="Epoch")
         print("Calc time correlations of GAN predictions {0:03d}".format(gan_index))
         gan_time_corr = pd.DataFrame(0.0, index=time_lags, columns=pdfs.columns, dtype=np.float32)
@@ -68,9 +69,10 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
                 gan_time_corr.loc[:, col] = time_correlations(data.loc[x_points, "Ux_t+1"], time_lags)
             else:
                 key = col.split("_")[0]
-                mod = col[len(key) + 1]
+                mod = col[len(key) + 1:]
                 gan_time_corr.loc[:, col] = time_correlations(gan_preds[key].loc[x_points, mod], time_lags)
-
+        gan_time_corr.to_csv(join(out_dir, "gan_{0:03d}_time_correlations.csv".format(gan_index)), 
+                             index_label="Time Lag")
     except Exception as e:
         print(traceback.format_exc())
         raise e

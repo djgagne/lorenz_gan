@@ -76,10 +76,11 @@ def offline_gan_predictions(gan_index, data,
             ar1.fit(data.loc[x_indices, "Ux_t+1"] - gen_preds["det"].loc[x_indices, gen_filenames[g]])
             print(gen_filenames[g], ar1.corr, ar1.noise_sd)
             gen_noise.loc[gen_filenames[g]] = [ar1.corr, ar1.noise_sd]
-            corr_noise[0] = rs.normal(size=(1, rand_size))
+            rs_corr = np.random.RandomState(seed)
+            corr_noise[0] = rs_corr.normal(size=(1, rand_size))
             print(gen_filenames[g], "random noise")
             for i in range(1, corr_noise.shape[0]):
-                corr_noise[i] = ar1.update(corr_noise[i - 1], rs)
+                corr_noise[i] = ar1.update(corr_noise[i - 1], rs_corr)
             print(gen_filenames[g], "Corr preds")
             gen_preds["corr"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
                                                                                     corr_noise, batch_size=batch_size,
