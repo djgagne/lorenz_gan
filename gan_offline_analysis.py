@@ -25,13 +25,14 @@ def main():
     pool.join()
     return
 
+
 def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
                          out_dir, meta_columns,
                          pdf_bins=np.arange(-16, 23, 0.1),
                          bandwidth=0.2,
                          time_lags=np.arange(1, 500), x_index=0):
     try:
-        from lorenz_gan.analysis import offline_gan_predictions, calc_pdf_kde, hellinger, time_correlations
+        from lorenz_gan.analysis import offline_gan_predictions, calc_pdf_hist, hellinger, time_correlations
         data = pd.read_csv(data_file, dtype='float32')
         epochs = np.array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 22, 24, 26, 28, 30],
                         dtype=np.int32)
@@ -47,10 +48,10 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
             pdf_columns += [key + "_" + x for x in gan_preds[key].columns]
         pdfs = pd.DataFrame(0.0, index=pdf_bins, columns=pdf_columns, dtype=np.float32)
         print("Calc PDFs of GAN predictions {0:03d}".format(gan_index))
-        pdfs.loc[:, "truth"] = calc_pdf_kde(data["Ux_t+1"].values, pdf_bins, bandwidth=bandwidth)
+        pdfs.loc[:, "truth"] = calc_pdf_hist(data["Ux_t+1"].values, pdf_bins)
         for key in gan_preds.keys():
             for col in gan_preds[key].columns:
-                pdfs.loc[:, key + "_" + col] = calc_pdf_kde(gan_preds[key][col].values, pdf_bins, bandwidth=bandwidth)
+                pdfs.loc[:, key + "_" + col] = calc_pdf_hist(gan_preds[key][col].values, pdf_bins)
         pdfs.to_csv(join(out_dir, "gan_{0:03d}_offline_pdfs.csv".format(gan_index)), index_label="Bins")
         print("Calc Hellingers of GAN predictions {0:03d}".format(gan_index))
         hellingers = pd.DataFrame(0.0, index=epochs,
@@ -58,7 +59,8 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
                                 dtype=np.float32)
         for key in gan_preds.keys():
             for c, col in enumerate(gan_preds[key].columns):
-                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdfs["truth"].values,
+                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdf_bins,
+                                                                                            pdfs["truth"].values,
                                                                                             pdfs[key + "_" + col].values)
         hellingers.to_csv(join(out_dir, "gan_{0:03d}_offline_hellinger.csv".format(gan_index)), index_label="Epoch")
         print("Calc time correlations of GAN predictions {0:03d}".format(gan_index))

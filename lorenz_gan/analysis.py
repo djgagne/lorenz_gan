@@ -6,7 +6,6 @@ from sklearn.mixture import GaussianMixture
 from glob import glob
 from os.path import join
 import keras.backend as K
-import traceback
 
 def load_test_data(filename,
                    input_columns=("X_t", "Ux_t"),
@@ -17,7 +16,7 @@ def load_test_data(filename,
     return data
 
 
-def hellinger(a, b):
+def hellinger_bad(a, b):
     """
     Calculate hellinger distance on 2 discrete PDFs a and b.
 
@@ -29,6 +28,11 @@ def hellinger(a, b):
 
     """
     return np.sqrt(np.sum((np.sqrt(a) - np.sqrt(b)) ** 2)) / np.sqrt(2)
+
+
+def hellinger(x, pdf_p, pdf_q):
+    pdf_distances = (np.sqrt(pdf_p) - np.sqrt(pdf_q)) ** 2
+    return np.trapz(pdf_distances, x) / 2
 
 
 def offline_gan_predictions(gan_index, data,
@@ -73,7 +77,7 @@ def offline_gan_predictions(gan_index, data,
             print(gen_filenames[g], "Random updater")
             ar1 = AR1RandomUpdater()
             x_indices = data["x_index"] == 0
-            ar1.fit(data.loc[x_indices, "Ux_t+1"] - gen_preds["det"].loc[x_indices, gen_filenames[g]])
+            ar1.fit(data.loc[x_indices, "Ux_t+1"].values - gen_preds["det"].loc[x_indices, gen_filenames[g]].values)
             print(gen_filenames[g], ar1.corr, ar1.noise_sd)
             gen_noise.loc[gen_filenames[g]] = [ar1.corr, ar1.noise_sd]
             rs_corr = np.random.RandomState(seed)
@@ -99,6 +103,10 @@ def calc_pdf_kde(x, x_bins, bandwidth=0.5, algorithm="kd_tree", leaf_size=100):
     kde.fit(x.reshape(-1, 1))
     pdf = np.exp(kde.score_samples(x_bins.reshape(-1, 1)))
     return pdf
+
+
+def calc_pdf_hist(x, x_bins):
+    return np.histogram(x, x_bins, density=True)[0]
 
 
 def calc_pdf_gmm(x, x_bins, n_components=4):
