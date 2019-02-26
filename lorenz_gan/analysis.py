@@ -53,13 +53,13 @@ def offline_gan_predictions(gan_index, data,
         gen_preds[pred_type] = pd.DataFrame(0, index=data.index, columns=gen_filenames,
                              dtype=np.float32)
     gen_noise = pd.DataFrame(0.0, dtype=np.float32, index=gen_filenames, columns=["corr", "noise_sd"])
-    for g, gen_file in enumerate(gen_files):
-        sess = K.tf.Session(config=K.tf.ConfigProto(intra_op_parallelism_threads=1,
+    sess_config = K.tf.ConfigProto(intra_op_parallelism_threads=1,
                                                 inter_op_parallelism_threads=1,
-                                                gpu_options=K.tf.GPUOptions(allow_growth=True)))
-        K.set_session(sess)
-        K.tf.set_random_seed(seed)
-        with K.tf.device("/cpu:0"):
+                                                gpu_options=K.tf.GPUOptions(allow_growth=True))
+    for g, gen_file in enumerate(gen_files):
+        with K.tf.Session(config=sess_config) as sess:
+            K.set_session(sess)
+            K.tf.set_random_seed(seed)
             print("Predicting " + gen_filenames[g])
             gen_model = SubModelGAN(gen_file)
             if gen_model.x_scaling_values.shape[0] == 1:
@@ -72,9 +72,9 @@ def offline_gan_predictions(gan_index, data,
                                                                                 stochastic=0)
             print(gen_filenames[g], "Rand preds")
             gen_preds["rand"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
-                                                                                    random_values,
-                                                                                    batch_size=batch_size,
-                                                                                    stochastic=1)
+                                                                                 random_values,
+                                                                                 batch_size=batch_size,
+                                                                                 stochastic=1)
             print(gen_filenames[g], "Random updater")
             ar1 = AR1RandomUpdater()
             x_indices = data["x_index"] == 0
@@ -90,12 +90,6 @@ def offline_gan_predictions(gan_index, data,
             #gen_preds["corr"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
             #                                                                        corr_noise, batch_size=batch_size,
             #                                                                        stochastic=1)
-            del ar1
-            del gen_model.model
-            del gen_model
-            #corr_noise[:] = 0
-        sess.close()
-        del sess
     return gen_preds, gen_noise
 
 
