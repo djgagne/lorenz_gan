@@ -88,13 +88,13 @@ def main():
     else:
         X_out, Y_out, times, steps = generate_lorenz_data(config["lorenz"])
         print(X_out.shape, Y_out.shape, saved_steps, split_step)
-        combined_data = process_lorenz_data(X_out[:split_step], Y_out[:split_step], times[:split_step],
+        combined_data = process_lorenz_data(X_out[:split_step], times[:split_step],
                                             steps[:split_step],
                                             config["lorenz"]["J"], config["lorenz"]["F"],
                                             config["lorenz"]["time_step"] * config["lorenz"]["skip"],
                                             config["gan"]["x_skip"],
                                             config["gan"]["t_skip"], u_scale)
-        combined_test_data = process_lorenz_data(X_out[split_step:], Y_out[split_step:], times[split_step:],
+        combined_test_data = process_lorenz_data(X_out[split_step:], times[split_step:],
                                                  steps[split_step:],
                                                  config["lorenz"]["J"], config["lorenz"]["F"],
                                                  config["lorenz"]["time_step"] * config["lorenz"]["skip"],
