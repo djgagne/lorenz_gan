@@ -46,7 +46,7 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
         pdf_columns = ["truth"]
         for key in gan_preds.keys():
             pdf_columns += [key + "_" + x for x in gan_preds[key].columns]
-        pdfs = pd.DataFrame(0.0, index=pdf_bins, columns=pdf_columns, dtype=np.float32)
+        pdfs = pd.DataFrame(0.0, index=pdf_bins[:-1], columns=pdf_columns, dtype=np.float32)
         print("Calc PDFs of GAN predictions {0:03d}".format(gan_index))
         pdfs.loc[:, "truth"] = calc_pdf_hist(data["Ux_t+1"].values, pdf_bins)
         for key in gan_preds.keys():
@@ -59,7 +59,7 @@ def run_offline_analysis(gan_index, data_file, gan_path, seed, batch_size,
                                 dtype=np.float32)
         for key in gan_preds.keys():
             for c, col in enumerate(gan_preds[key].columns):
-                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdf_bins,
+                hellingers.loc[epochs[c], "{0:04d}_{1}".format(gan_index, key)] = hellinger(pdf_bins[:-1],
                                                                                             pdfs["truth"].values,
                                                                                             pdfs[key + "_" + col].values)
         hellingers.to_csv(join(out_dir, "gan_{0:03d}_offline_hellinger.csv".format(gan_index)), index_label="Epoch")
