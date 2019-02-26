@@ -6,6 +6,7 @@ import numpy as np
 import traceback
 from os.path import join
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("config", default="lorenz.yaml", help="Config yaml file")

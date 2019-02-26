@@ -12,4 +12,5 @@ echo `hostname`
 source /glade/u/home/dgagne/.bashrc
 export PATH="/glade/u/home/dgagne/miniconda3/envs/ml/bin:$PATH"
 cd /glade/u/home/dgagne/lorenz_gan
+python setup.py install
 python -u gan_offline_analysis.py config/exp_20_stoch/gan_offline_config.yaml -n 4 &> offline_gan.log

@@ -1,7 +1,7 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete
-from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete
+from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, unnormalize_data
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
 import xarray as xr
 import keras.backend as K
@@ -218,9 +218,10 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
               rand_vec_length, config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"])
     gen_pred_func = predict_stochastic(gen_model)
-    gen_ts_preds = gen_pred_func([combined_time_series[x_cols],
-                                  np.zeros((combined_time_series.shape[0],
-                                            rand_vec_length))])[0]
+    gen_ts_preds = unnormalize_data(gen_pred_func([combined_time_series[x_cols],
+                                                   np.zeros((combined_time_series.shape[0],
+                                                             rand_vec_length)),
+                                                   0])[0], scaling_values=Y_scaling_values)
     gen_ts_residuals = combined_time_series[y_cols].values.ravel() - gen_ts_preds.ravel()
     train_random_updater(gen_ts_residuals,
                          config["random_updater"]["out_file"].replace(".pkl",
