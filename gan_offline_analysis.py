@@ -18,7 +18,7 @@ def main():
     gan_indices = config["gan_indices"]
     data_file = config["data_file"]
     jobs = []
-    pool = Pool(args.nprocs)
+    pool = Pool(args.nprocs, maxtasksperchild=1)
     for gan_index in gan_indices:
         jobs.append(pool.apply_async(run_offline_analysis, (gan_index, data_file, config["gan_path"],
                                   config["seed"], config["batch_size"], config["out_path"], config["meta_columns"])))

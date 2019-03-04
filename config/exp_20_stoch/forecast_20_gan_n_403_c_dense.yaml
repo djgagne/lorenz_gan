@@ -15,5 +15,5 @@ call_param_once: 1
 predict_residuals: 0
 max_tasks: 1000
 lorenz_nc_file: /glade/work/dgagne/exp_20_stoch/lorenz_output.nc
-out_path: /glade/work/dgagne/exp_20_stoch/gan_403_weather/
+out_path: /glade/work/dgagne/exp_20_stoch/v2/gan_403_weather/
 

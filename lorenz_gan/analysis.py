@@ -5,8 +5,9 @@ from sklearn.neighbors import KernelDensity
 from sklearn.mixture import GaussianMixture
 from glob import glob
 from os.path import join
+import tensorflow as tf
 import keras.backend as K
-
+import gc
 
 def load_test_data(filename,
                    input_columns=("X_t", "Ux_t"),
@@ -50,48 +51,55 @@ def offline_gan_predictions(gan_index, data,
     #corr_noise = np.zeros((data.shape[0], rand_size), dtype=np.float32)
     gen_preds = dict()
     for pred_type in ["det", "rand"]:
-        gen_preds[pred_type] = pd.DataFrame(0, index=data.index, columns=gen_filenames,
-                             dtype=np.float32)
+        #gen_preds[pred_type] = pd.DataFrame(0.0, index=data.index, columns=gen_filenames)
+        gen_preds[pred_type] = np.zeros((data.shape[0], len(gen_filenames)), dtype="float32")
     gen_noise = pd.DataFrame(0.0, dtype=np.float32, index=gen_filenames, columns=["corr", "noise_sd"])
-    sess_config = K.tf.ConfigProto(intra_op_parallelism_threads=1,
-                                                inter_op_parallelism_threads=1,
-                                                gpu_options=K.tf.GPUOptions(allow_growth=True))
     for g, gen_file in enumerate(gen_files):
-        with K.tf.Session(config=sess_config) as sess:
-            K.set_session(sess)
-            K.tf.set_random_seed(seed)
-            print("Predicting " + gen_filenames[g])
-            gen_model = SubModelGAN(gen_file)
-            if gen_model.x_scaling_values.shape[0] == 1:
-                input_cols = ["X_t"]
-            else:
-                input_cols = ["X_t", "Ux_t"]
-            print(gen_filenames[g], "Det preds")
-            gen_preds["det"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
-                                                                                all_zeros, batch_size=batch_size,
-                                                                                stochastic=0)
-            print(gen_filenames[g], "Rand preds")
-            gen_preds["rand"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
-                                                                                 random_values,
-                                                                                 batch_size=batch_size,
-                                                                                 stochastic=1)
-            print(gen_filenames[g], "Random updater")
-            ar1 = AR1RandomUpdater()
-            x_indices = data["x_index"] == 0
-            ar1.fit(data.loc[x_indices, "Ux_t+1"].values - gen_preds["det"].loc[x_indices, gen_filenames[g]].values)
-            print(gen_filenames[g], ar1.corr, ar1.noise_sd)
-            gen_noise.loc[gen_filenames[g]] = [ar1.corr, ar1.noise_sd]
-            #rs_corr = np.random.RandomState(seed)
-            #corr_noise[0] = rs_corr.normal(size=(1, rand_size))
-            #print(gen_filenames[g], "random noise")
-            #for i in range(1, corr_noise.shape[0]):
-            #    corr_noise[i] = ar1.update(corr_noise[i - 1], rs_corr)
-            #print(gen_filenames[g], "Corr preds")
-            #gen_preds["corr"].loc[:, gen_filenames[g]] = gen_model.predict_batch(data[input_cols],
-            #                                                                        corr_noise, batch_size=batch_size,
-            #                                                                        stochastic=1)
-    return gen_preds, gen_noise
+        gen_f = gen_filenames[g]
+        gen_preds["det"][:, g], gen_preds["rand"][:, g], gen_noise.loc[gen_f] = single_gan_predictions(gen_file, 
+                                                                                                                       data,  
+                                                                                                                       all_zeros, 
+                                                                                                                       random_values, 
+                                                                                                                       seed,
+                                                                                                                       batch_size)     
+        gc.collect()
+    gen_preds_out = {}
+    del all_zeros
+    del random_values
+    gc.collect()
+    for k in list(gen_preds.keys()):
+        gen_preds_out[k] = pd.DataFrame(gen_preds[k], index=data.index, columns=gen_filenames)
+        del gen_preds[k]
+    gc.collect()
+    return gen_preds_out, gen_noise
 
+def single_gan_predictions(gen_file, data, all_zeros, random_values, seed, batch_size):
+    sess_config = K.tf.ConfigProto(intra_op_parallelism_threads=1,
+                                   inter_op_parallelism_threads=1,
+                                   gpu_options=K.tf.GPUOptions(allow_growth=True))
+    sess = K.tf.Session(config=sess_config)
+    K.set_session(sess)
+    K.tf.set_random_seed(seed)
+    print("Predicting " + gen_file)
+    gen_model = SubModelGAN(gen_file)
+    if gen_model.x_scaling_values.shape[0] == 1:
+        input_cols = ["X_t"]
+    else:
+        input_cols = ["X_t", "Ux_t"]
+    print(gen_file, "Det preds")
+    det_preds  = gen_model.predict_batch(data[input_cols], all_zeros, batch_size=batch_size, stochastic=0)
+    print(gen_file, "Rand preds")
+    rand_preds = gen_model.predict_batch(data[input_cols],
+                                         random_values,
+                                         batch_size=batch_size,
+                                        stochastic=1)
+    print(gen_file, "Random updater")
+    ar1 = AR1RandomUpdater()
+    x_indices = data["x_index"] == 0
+    ar1.fit(data.loc[x_indices, "Ux_t+1"].values - det_preds[x_indices].ravel())
+    print(gen_file, ar1.corr, ar1.noise_sd)
+    #gen_noise.loc[gen_filenames[g]] = [ar1.corr, ar1.noise_sd]
+    return det_preds, rand_preds, np.array([ar1.corr, ar1.noise_sd])
 
 def calc_pdf_kde(x, x_bins, bandwidth=0.5, algorithm="kd_tree", leaf_size=100):
     kde = KernelDensity(bandwidth=bandwidth, algorithm=algorithm, leaf_size=leaf_size)

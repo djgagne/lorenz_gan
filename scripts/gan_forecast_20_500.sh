@@ -1,6 +1,6 @@
 #!/bin/bash
 #PBS -N f_gan_500
-#PBS -A P54048000
+#PBS -A NAML0001
 #PBS -q regular
 #PBS -l walltime=08:00:00
 #PBS -l select=1:ncpus=36:ompthreads=36

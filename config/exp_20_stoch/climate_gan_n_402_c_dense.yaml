@@ -12,5 +12,5 @@ initial_step: 2000000
 x_only: 1
 predict_residuals: 0
 lorenz_nc_file: /glade/work/dgagne/exp_20_stoch/lorenz_output.nc
-out_path: /glade/work/dgagne/exp_20_stoch/gan_402_climate/
+out_path: /glade/work/dgagne/exp_20_stoch/v2/gan_402_climate/
 num_tf_threads: 8
