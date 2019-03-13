@@ -1,7 +1,7 @@
 import subprocess
 
 def main():
-    config_nums = [100, 101, 102, 103, 202, 203, 500, 501, 502, 503, 602, 603]
+    config_nums = [500, 501, 502, 503, 602, 603]
     config_types = ["climate", "forecast_20"]
     n_procs = [1, 36]
     for t, config_type in enumerate(config_types):
