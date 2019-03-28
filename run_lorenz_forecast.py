@@ -8,6 +8,7 @@ from lorenz_gan.submodels import SubModelGAN, load_ann_model
 from multiprocessing import Pool
 import pickle
 import traceback
+from os import makedirs
 from os.path import join, exists
 import os
 
@@ -38,6 +39,8 @@ def main():
         initial_steps = np.arange(initial_step[0], initial_step[1] + initial_step[2], initial_step[2]).astype(int)
     print("Initial steps", initial_steps, initial_steps.size)
     out_path = config["out_path"]
+    if not exists(out_path):
+        makedirs(out_path)
     x_only = bool(config["x_only"])
     if "predict_residuals" in config.keys():
         predict_residuals = bool(config["predict_residuals"])

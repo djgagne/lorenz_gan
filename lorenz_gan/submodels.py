@@ -7,7 +7,7 @@ import numpy as np
 from os.path import join, exists
 import pandas as pd
 from scipy.stats import rv_histogram, norm
-from lorenz_gan.gan import Interpolate1D, unnormalize_data, normalize_data, ConcreteDropout, Split1D, Scale
+from lorenz_gan.gan import Interpolate1D, unnormalize_data, normalize_data, ConcreteDropout, Split1D, Scale, AutoScale
 from sklearn.linear_model import LinearRegression
 import yaml
 
@@ -20,7 +20,8 @@ class SubModelGAN(object):
         self.model = load_model(self.model_path, custom_objects={"Interpolate1D": Interpolate1D,
                                                                  "ConcreteDropout": ConcreteDropout,
                                                                  "Split1D": Split1D,
-                                                                 "Scale": Scale})
+                                                                 "Scale": Scale,
+                                                                 "AutoScale": AutoScale})
         self.pred_func = K.function(self.model.input + [K.learning_phase()], [self.model.output])
         self.x_scaling_file = join(self.model_path_start, "gan_X_scaling_values_{0}.csv".format(self.model_config))
         self.y_scaling_file = join(self.model_path_start, "gan_Y_scaling_values_{0}.csv".format(self.model_config))
