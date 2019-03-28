@@ -578,6 +578,50 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
     return generator
 
 
+def generator_dense_auto_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neurons=8,
+                          num_outputs=1, activation="selu", l2_strength=0.01, normalize=True, min_exp=-5,
+                          max_exp=0, **kwargs):
+    """
+    Dense conditional generator network. Includes 2 hidden layers.
+
+    Args:
+        num_cond_inputs (int): Size of the conditional input vector.
+        num_random_inputs (int): Size of the random input vector.
+        num_outputs (int): Number of output neurons
+        activation (str): Activation function for the hidden layer.
+
+    Returns:
+        Generator Keras Model object.
+    """
+    gen_cond_input = Input(shape=(num_cond_inputs, ))
+    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
+    gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
+    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)
+    gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
+                              stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
+    gen_rand_cond_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_cond)
+    gen_rand_hidden_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_hidden)
+    gen_cond_noisy = Add()([gen_cond_input, gen_rand_cond_scaled])
+    gen_model = concatenate([gen_cond_noisy, gen_rand_in])
+    gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
+    gen_model = Add()([gen_model, gen_rand_hidden_scaled])
+    gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
+    if activation == "leaky":
+        gen_model = LeakyReLU(0.2)(gen_model)
+    else:
+        gen_model = Activation(activation)(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
+    gen_model = Reshape((num_outputs, 1))(gen_model)
+    if normalize:
+        gen_model = BatchNormalization()(gen_model)
+    generator = Model([gen_cond_input, gen_rand_input], gen_model)
+    return generator
+
+
 def discriminator_dense(num_cond_inputs=1, num_sample_inputs=1, num_hidden_neurons=8,
                         num_hidden_layers=2, activation="selu", l2_strength=0.01, dropout_alpha=0,
                         use_dropout=True, use_noise=True, noise_sd=0.1):

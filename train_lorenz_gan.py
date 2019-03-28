@@ -1,6 +1,6 @@
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
-from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete
+from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete, generator_dense_auto_stoch
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, unnormalize_data
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
 import xarray as xr
@@ -196,6 +196,12 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
         rand_vec_length = config["gan"]["generator"]["num_random_inputs"]
     elif config["gan"]["structure"] == "specified_random":
         gen_model = generator_dense_stoch(**config["gan"]["generator"])
+        disc_model = discriminator_dense(**config["gan"]["discriminator"])
+        rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
+                          config["gan"]["generator"]["num_hidden_neurons"] + \
+                          config["gan"]["generator"]["num_cond_inputs"]
+    elif config["gan"]["structure"] == "auto_stoch":
+        gen_model = generator_dense_auto_stoch(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
         rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
                           config["gan"]["generator"]["num_hidden_neurons"] + \
