@@ -552,7 +552,7 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
     gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
-    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)
+    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
                               stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_cond_scaled = Scale(noise_sd)(gen_rand_cond)
@@ -596,7 +596,7 @@ def generator_dense_auto_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidde
     gen_cond_input = Input(shape=(num_cond_inputs, ))
     gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
     gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
-    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)
+    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
                               stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_cond_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_cond)
