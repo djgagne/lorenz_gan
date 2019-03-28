@@ -11,6 +11,8 @@ import pandas as pd
 from os.path import join
 from keras.regularizers import l2
 from keras.engine import InputSpec
+from keras.initializers import Initializer
+from keras.constraints import Constraint
 from keras.layers import Dense, Wrapper, Lambda
 
 
@@ -60,7 +62,7 @@ class Split1D(Layer):
 
 
 class Scale(Layer):
-    def __init__(self, scale_factor=1, **kwargs):
+    def __init__(self, scale_factor=1.0, **kwargs):
         self.scale_factor = scale_factor
         super(Scale, self).__init__(**kwargs)
 
@@ -74,6 +76,62 @@ class Scale(Layer):
         config = {'scale_factor': self.scale_factor}
         base_config = super(Scale, self).get_config()
         return dict(list(base_config.items()) + list(config.items()))
+
+
+class Log10RandomUniform(Initializer):
+    def __init__(self, min_exp=-4, max_exp=0, seed=None):
+        self.min_exp = min_exp
+        self.max_exp = max_exp
+        self.seed = seed
+
+    def __call__(self, input_shape, dtype=None):
+        return 10.0 ** K.random_uniform(input_shape, minval=self.min_exp,
+                                        maxval=self.max_exp, dtype=dtype, seed=self.seed)
+
+    def get_config(self):
+        return {"min_exp": self.min_exp,
+                "max_exp": self.max_exp,
+                "seed": self.seed}
+
+
+class MinMaxConstraint(Constraint):
+    def __init__(self, min_val, max_val):
+        self.min_val = min_val
+        self.max_val = max_val
+
+    def __call__(self, w):
+        return K.clip(w, self.min_val, self.max_val)
+
+    def get_config(self):
+        return {"min_val": self.min_val,
+                "max_val": self.max_val}
+
+
+class AutoScale(Layer):
+    def __init__(self, min_exp=-4, max_exp=0, **kwargs):
+        self.min_exp = min_exp
+        self.max_exp = max_exp
+        self.scales = None
+        super(AutoScale, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        assert len(input_shape) == 2
+        input_dim = input_shape[1]
+        self.scales = self.add_weight(name="scales", shape=(input_dim, ),
+                                      initializer=Log10RandomUniform(),
+                                      constraint=MinMaxConstraint(10.0 ** self.min_exp,
+                                                                 10.0 ** self.max_exp))
+
+        return
+
+    def call(self, inputs, **kwargs):
+        output = inputs * self.scales
+        return output
+
+    def get_config(self):
+        return {"min_exp": self.min_exp,
+                "max_exp": self.max_exp,
+                }
 
 class ConcreteDropout(Wrapper):
     """This wrapper allows to learn the dropout probability for any given input layer.
@@ -492,17 +550,21 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
         Generator Keras Model object.
     """
     gen_cond_input = Input(shape=(num_cond_inputs, ))
-    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons, ))
+    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
     gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
-    gen_rand_hidden = Split1D(start=num_random_inputs, stop=num_hidden_neurons + num_random_inputs)(gen_rand_input)
-    gen_rand_hidden = Scale(noise_sd)(gen_rand_hidden)
-    gen_model = concatenate([gen_cond_input, gen_rand_in])
+    gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)
+    gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
+                              stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
+    gen_rand_cond_scaled = Scale(noise_sd)(gen_rand_cond)
+    gen_rand_hidden_scaled = Scale(noise_sd)(gen_rand_hidden)
+    gen_cond_noisy = Add()([gen_cond_input, gen_rand_cond_scaled])
+    gen_model = concatenate([gen_cond_noisy, gen_rand_in])
     gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
     if activation == "leaky":
         gen_model = LeakyReLU(0.2)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
-    gen_model = Add()([gen_model, gen_rand_hidden])
+    gen_model = Add()([gen_model, gen_rand_hidden_scaled])
     gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
     if activation == "leaky":
         gen_model = LeakyReLU(0.2)(gen_model)

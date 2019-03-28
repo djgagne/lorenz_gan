@@ -198,7 +198,8 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
         gen_model = generator_dense_stoch(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
         rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
-                          config["gan"]["generator"]["num_hidden_neurons"]
+                          config["gan"]["generator"]["num_hidden_neurons"] + \
+                          config["gan"]["generator"]["num_cond_inputs"]
     elif config["gan"]["structure"] == "concrete":
         gen_model = generator_conv_concrete(**config["gan"]["generator"])
         disc_model = discriminator_conv_concrete(**config["gan"]["discriminator"])
@@ -218,7 +219,8 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
               rand_vec_length, config["gan"]["gan_path"],
               config["gan"]["gan_index"], config["gan"]["num_epochs"], config["gan"]["metrics"])
     gen_pred_func = predict_stochastic(gen_model)
-    gen_ts_preds = unnormalize_data(gen_pred_func([combined_time_series[x_cols],
+    gen_ts_preds = unnormalize_data(gen_pred_func([normalize_data(combined_time_series[x_cols],
+                                                                  scaling_values=X_scaling_values),
                                                    np.zeros((combined_time_series.shape[0],
                                                              rand_vec_length)),
                                                    0])[0], scaling_values=Y_scaling_values)
