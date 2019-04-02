@@ -1,11 +1,11 @@
-num_members: 20
+num_members: 1
 initial_x: []
 F: 20
 u_model_name: gan
 u_model_path: ./exp_travis/gan_generator_0000_epoch_0030.h5
 random_updater_path: ./exp_travis/ar1_random_updater_0000.pkl
-num_steps: 1000
-num_random: 19
+num_steps: 10000
+num_random: 35
 time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 6000]
@@ -15,3 +15,4 @@ call_param_once: 1
 predict_residuals: 0
 lorenz_nc_file: ./exp_travis/lorenz_output.nc
 out_path: ./exp_travis/exp_gan/
+num_tf_threads: 1

@@ -157,18 +157,23 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     x_u_curr[0] = x_initial[:]
     x_u_curr[1] = u_initial[:]
     coords = {"step": steps, "x_size": np.arange(x_initial.size)}
-    X_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-                         coords=coords, dims=("step", "x_size"),
-                         attrs={"long_name": "x values"})
-    U_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-                         coords=coords, dims=("step", "x_size"),
-                         attrs={"long_name": "u total values"})
-    U_res_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-                             coords=coords, dims=("step", "x_size"),
-                             attrs={"long_name": "u residual values"})
+    #X_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
+    #                     coords=coords, dims=("step", "x_size"),
+    #                     attrs={"long_name": "x values"})
+    #U_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
+    #                     coords=coords, dims=("step", "x_size"),
+    #                     attrs={"long_name": "u total values"})
+    #U_res_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
+    #                         coords=coords, dims=("step", "x_size"),
+    #                         attrs={"long_name": "u residual values"})
+    #X_out[0] = x_initial[:]
+    #U_out[0] = u_initial[:]
+    X_out = np.zeros((num_steps, x_initial.size))
+    U_out = np.zeros((num_steps, x_initial.size))
+    U_res_out = np.zeros((num_steps, x_initial.size))
+    k_dXdt = np.zeros((order, x_initial.shape[0]))
     X_out[0] = x_initial[:]
     U_out[0] = u_initial[:]
-    k_dXdt = np.zeros((order, x_initial.shape[0]))
     if not predict_residuals:
         if rs is None:
             random_values = np.random.normal(size=(x_initial.size, num_random))
@@ -208,7 +213,13 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
             x_u_curr[2] = u_model.predict_res(x_u_curr[2])
         else:
             random_values = random_updater.update(random_values)
-    output = xr.Dataset(data_vars=dict(x=X_out, u=U_out, u_res=U_res_out, time=times),
+    output = xr.Dataset(data_vars=dict(x=xr.DataArray(X_out, coords=coords,
+                                                      dims=("step", "x_size"), attrs={"long_name": "x values"}),
+                                       u=xr.DataArray(U_out, coords=coords,
+                                                      dims=("step", "x_size"), attrs={"long_name": "u values"}),
+                                       u_res=xr.DataArray(U_res_out, coords=coords,
+                                                      dims=("step", "x_size"), attrs={"long_name": "u res values"}),
+                                       time=times),
                         coords=coords)
     return output
 

@@ -21,24 +21,24 @@ gan:
         num_cond_inputs: 2
         num_random_inputs: 1
         num_outputs: 1
-        num_hidden_neurons: 16
+        num_hidden_neurons: 32
         activation: selu
         noise_sd: 0.001
-        l2_strength: 0.001
-        normalize: 1
+        l2_strength: 0.002
+        normalize: 0
     discriminator:
         num_cond_inputs: 2
         num_sample_inputs: 1
         activation: selu
         num_hidden_layers: 2
-        num_hidden_neurons: 16
-        l2_strength: 0.001
+        num_hidden_neurons: 32
+        l2_strength: 0.002
         dropout_alpha: 0
         use_dropout: 0
         use_noise: 1
         noise_sd: 0.001
     gan_path: /glade/work/dgagne/exp_20_stoch/
-    batch_size: 1024
+    batch_size: 256
     gan_index: 703
     loss: binary_crossentropy
     learning_rate: 0.0001

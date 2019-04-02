@@ -38,7 +38,7 @@ class SubModelGAN(object):
             predictions = predictions.ravel()
         return predictions
 
-    def predict_batch(self, cond_x, random_x, batch_size=8, stochastic=1):
+    def predict_batch(self, cond_x, random_x, batch_size=8, stochastic=0):
         norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
         batch_indices = np.arange(0, norm_x.shape[0], batch_size, dtype=np.int32)
         batch_indices = np.append(batch_indices, norm_x.shape[0])

@@ -570,7 +570,7 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
         gen_model = LeakyReLU(0.2)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
-    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2(l2_strength))(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
         gen_model = BatchNormalization()(gen_model)
@@ -614,7 +614,7 @@ def generator_dense_auto_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidde
         gen_model = LeakyReLU(0.2)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
-    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2(l2_strength))(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
         gen_model = BatchNormalization()(gen_model)
