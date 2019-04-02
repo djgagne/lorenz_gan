@@ -44,6 +44,10 @@ def offline_gan_predictions(gan_index, data,
     gen_filenames = [gf.split("/")[-1] for gf in gen_files]
     if gan_index < 300:
         rand_size = 1
+    elif gan_index >= 700 and gan_index < 800:
+        rand_size = 19
+    elif gan_index >= 800:
+        rand_size = 18
     else:
         rand_size = 17
     random_values = rs.normal(size=(data.shape[0], rand_size))

@@ -1,8 +1,9 @@
 import subprocess
 
 def main():
-    config_nums = [500, 501, 502, 503, 602, 603]
-    config_types = ["climate", "forecast_20"]
+    config_nums = [700, 701, 702, 703, 801, 802, 803]
+    #config_types = ["climate", "forecast_20"]
+    config_types = ["climate"]
     n_procs = [1, 36]
     for t, config_type in enumerate(config_types):
         for config_num in config_nums:
@@ -10,7 +11,7 @@ def main():
                                               forecast_type=config_type,
                                               n_procs=n_procs[t])
             #print(script)
-            script_filename = "scripts_v2/gan_{0}_{1:03d}.sh".format(config_type, config_num)
+            script_filename = "scripts_v1.5/gan_{0}_{1:03d}_w.sh".format(config_type, config_num)
             print(script_filename)
             with open(script_filename, "w") as script_file:
                 script_file.write(script)
@@ -40,7 +41,7 @@ def create_submission_script(config_num,
     sub_str += "source /glade/u/home/dgagne/.bash_profile\n"
     sub_str += 'export PATH="/glade/u/home/dgagne/miniconda3/envs/ml/bin:$PATH"\n'
     sub_str += "cd /glade/u/home/dgagne/lorenz_gan\n"
-    sub_str += "python -u run_lorenz_forecast.py {0}{1}_gan_n_{2:03d}_c_dense.yaml -p {3:d} &> gan_{2:03d}_{1}.log\n".format(config_path, forecast_type, config_num,
+    sub_str += "python -u run_lorenz_forecast.py {0}{1}_gan_n_{2:03d}_c_dense_w.yaml -p {3:d} &> gan_{2:03d}_{1}.log\n".format(config_path, forecast_type, config_num,
     n_procs)
     return sub_str
 
