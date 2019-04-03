@@ -15,7 +15,7 @@ gan:
     t_skip: 5
     x_skip: 1
     output: sample
-    cond_inputs: ["X_t"]
+    cond_inputs: ["X_t", "Ux_t"]
     output_cols: ["Ux_t+1"]
     generator:
         num_cond_inputs: 2
