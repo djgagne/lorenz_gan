@@ -526,7 +526,7 @@ def generator_dense(num_cond_inputs=1, num_random_inputs=1, num_hidden_layers=1,
             gen_model = LeakyReLU(0.2)(gen_model)
         else:
             gen_model = Activation(activation)(gen_model)
-    gen_model = Dense(num_outputs, kernel_regularizer=l2())(gen_model)
+    gen_model = Dense(num_outputs, kernel_regularizer=l2(l2_strength))(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
         gen_model = BatchNormalization()(gen_model)
@@ -550,13 +550,16 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
         Generator Keras Model object.
     """
     gen_cond_input = Input(shape=(num_cond_inputs, ))
-    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
+    gen_rand_input = Input(shape=(num_random_inputs + 2 * num_hidden_neurons + num_cond_inputs, ))
     gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
     gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
                               stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
+    gen_rand_out = Split1D(start=num_hidden_neurons + num_random_inputs + num_cond_inputs,
+                           stop=2 * num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_cond_scaled = Scale(noise_sd)(gen_rand_cond)
     gen_rand_hidden_scaled = Scale(noise_sd)(gen_rand_hidden)
+    gen_rand_out_scaled = Scale(noise_sd)(gen_rand_out)
     gen_cond_noisy = Add()([gen_cond_input, gen_rand_cond_scaled])
     gen_model = concatenate([gen_cond_noisy, gen_rand_in])
     gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
@@ -570,6 +573,7 @@ def generator_dense_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidden_neu
         gen_model = LeakyReLU(0.2)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
+    gen_model = Add()([gen_model, gen_rand_out_scaled])
     gen_model = Dense(num_outputs, kernel_regularizer=l2(l2_strength))(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
@@ -594,26 +598,30 @@ def generator_dense_auto_stoch(num_cond_inputs=1, num_random_inputs=1, num_hidde
         Generator Keras Model object.
     """
     gen_cond_input = Input(shape=(num_cond_inputs, ))
-    gen_rand_input = Input(shape=(num_random_inputs + num_hidden_neurons + num_cond_inputs, ))
+    gen_rand_input = Input(shape=(num_random_inputs + 2 * num_hidden_neurons + num_cond_inputs, ))
     gen_rand_in = Split1D(start=0, stop=num_random_inputs)(gen_rand_input)
     gen_rand_cond = Split1D(start=num_random_inputs, stop=num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_hidden = Split1D(start=num_random_inputs + num_cond_inputs,
                               stop=num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
+    gen_rand_out = Split1D(start=num_hidden_neurons + num_random_inputs + num_cond_inputs,
+                           stop=2 * num_hidden_neurons + num_random_inputs + num_cond_inputs)(gen_rand_input)
     gen_rand_cond_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_cond)
     gen_rand_hidden_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_hidden)
+    gen_rand_out_scaled = AutoScale(min_exp=min_exp, max_exp=max_exp)(gen_rand_out)
     gen_cond_noisy = Add()([gen_cond_input, gen_rand_cond_scaled])
     gen_model = concatenate([gen_cond_noisy, gen_rand_in])
     gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
     if activation == "leaky":
-        gen_model = LeakyReLU(0.2)(gen_model)
+        gen_model = LeakyReLU(0.1)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
     gen_model = Add()([gen_model, gen_rand_hidden_scaled])
     gen_model = Dense(num_hidden_neurons, kernel_regularizer=l2(l2_strength))(gen_model)
     if activation == "leaky":
-        gen_model = LeakyReLU(0.2)(gen_model)
+        gen_model = LeakyReLU(0.1)(gen_model)
     else:
         gen_model = Activation(activation)(gen_model)
+    gen_model = Add()([gen_model, gen_rand_out_scaled])
     gen_model = Dense(num_outputs, kernel_regularizer=l2(l2_strength))(gen_model)
     gen_model = Reshape((num_outputs, 1))(gen_model)
     if normalize:
@@ -793,7 +801,7 @@ def train_gan(train_sample_data, train_cond_data, generator, discriminator, gen_
             combo_cond_data_batch[:] = train_cond_data[train_order[b_index - batch_size: b_index]]
             combo_data_batch[:batch_half] = train_sample_data[train_order[b_index - batch_size: b_index - batch_half]]
             combo_data_batch[batch_half:] = gen_pred_func([combo_cond_data_batch[batch_half:],
-                                                           batch_vec[batch_half:], True])[0]
+                                                           batch_vec[batch_half:], False])[0]
             disc_loss_history.append(discriminator.train_on_batch([combo_cond_data_batch,
                                                                    combo_data_batch],
                                                                   batch_labels))

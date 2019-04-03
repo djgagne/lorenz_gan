@@ -28,7 +28,7 @@ class SubModelGAN(object):
         self.y_scaling_values = pd.read_csv(self.y_scaling_file, index_col="Channel")
         self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
-    def predict(self, cond_x, random_x, train_mode=0):
+    def predict(self, cond_x, random_x, train_mode=1):
         norm_x = normalize_data(np.expand_dims(cond_x, axis=2), scaling_values=self.x_scaling_values)[0]
         predictions = unnormalize_data(self.pred_func([norm_x[:, :, 0], random_x, train_mode])[0],
                                        self.y_scaling_values)[:, :, 0]

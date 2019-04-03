@@ -21,25 +21,27 @@ gan:
         num_cond_inputs: 2
         num_random_inputs: 1
         num_outputs: 1
-        num_hidden_neurons: 32
+        num_hidden_neurons: 16
         activation: selu
-        l2_strength: 0.002
+        l2_strength: 0.001
         use_dropout: 0
         noise_sd: 0.01
-        normalize: 0
+        min_exp: -1
+        normalize: 1
+
     discriminator:
         num_cond_inputs: 2
         num_sample_inputs: 1
         activation: selu
         num_hidden_layers: 2
-        num_hidden_neurons: 32
-        l2_strength: 0.002
+        num_hidden_neurons: 16
+        l2_strength: 0.001
         use_dropout: 0
         dropout_alpha: 0.0
         use_noise: 1
         noise_sd: 0.01
     gan_path: ./exp_travis
-    batch_size: 256
+    batch_size: 1024
     gan_index: 0
     loss: binary_crossentropy
     learning_rate: 0.0001

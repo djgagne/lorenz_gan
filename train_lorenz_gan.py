@@ -198,13 +198,13 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
         gen_model = generator_dense_stoch(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
         rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
-                          config["gan"]["generator"]["num_hidden_neurons"] + \
+                          2 * config["gan"]["generator"]["num_hidden_neurons"] + \
                           config["gan"]["generator"]["num_cond_inputs"]
     elif config["gan"]["structure"] == "auto_stoch":
         gen_model = generator_dense_auto_stoch(**config["gan"]["generator"])
         disc_model = discriminator_dense(**config["gan"]["discriminator"])
         rand_vec_length = config["gan"]["generator"]["num_random_inputs"] + \
-                          config["gan"]["generator"]["num_hidden_neurons"] + \
+                          2 * config["gan"]["generator"]["num_hidden_neurons"] + \
                           config["gan"]["generator"]["num_cond_inputs"]
     elif config["gan"]["structure"] == "concrete":
         gen_model = generator_conv_concrete(**config["gan"]["generator"])
