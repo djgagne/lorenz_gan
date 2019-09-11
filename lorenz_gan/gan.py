@@ -3,6 +3,7 @@ from keras.layers import Conv1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1
 from keras.layers import GaussianNoise
 from keras.initializers import RandomUniform
 import keras.backend as K
+import tensorflow as tf
 from keras.optimizers import Adam
 from scipy.stats import expon
 from keras.models import Model
@@ -70,7 +71,7 @@ class Scale(Layer):
         return input_shape
 
     def call(self, inputs, **kwargs):
-        return K.tf.scalar_mul(K.constant(self.scale_factor), inputs)
+        return tf.scalar_mul(K.constant(self.scale_factor), inputs)
 
     def get_config(self):
         config = {'scale_factor': self.scale_factor}

@@ -78,12 +78,12 @@ def offline_gan_predictions(gan_index, data,
     return gen_preds_out, gen_noise
 
 def single_gan_predictions(gen_file, data, all_zeros, random_values, seed, batch_size):
-    sess_config = K.tf.ConfigProto(intra_op_parallelism_threads=1,
+    sess_config = tf.ConfigProto(intra_op_parallelism_threads=1,
                                    inter_op_parallelism_threads=1,
-                                   gpu_options=K.tf.GPUOptions(allow_growth=True))
-    sess = K.tf.Session(config=sess_config)
+                                   gpu_options=tf.GPUOptions(allow_growth=True))
+    sess = tf.Session(config=sess_config)
     K.set_session(sess)
-    K.tf.set_random_seed(seed)
+    tf.set_random_seed(seed)
     print("Predicting " + gen_file)
     gen_model = SubModelGAN(gen_file)
     if gen_model.x_scaling_values.shape[0] == 1:
