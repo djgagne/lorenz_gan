@@ -9,4 +9,5 @@
 module unload ncarenv
 source /glade/u/home/dgagne/.bashrc
 cd /glade/work/dgagne/
-/glade/u/home/dgagne/rclone -v sync exp_20_stoch/v2 gd:Lorenz_GAN_docs/exp_20_stoch/v2 >& transfer.log
+/glade/u/home/dgagne/rclone -v sync exp_20_stoch/v1.5/gan_climate_70* gd:Lorenz_GAN_docs/exp_20_stoch/v1.5 >& transfer.log
+/glade/u/home/dgagne/rclone -v sync exp_20_stoch/v1.5/gan_climate_80* gd:Lorenz_GAN_docs/exp_20_stoch/v1.5 >& transfer.log

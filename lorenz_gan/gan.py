@@ -13,8 +13,8 @@ from keras.regularizers import l2
 from keras.engine import InputSpec
 from keras.initializers import Initializer
 from keras.constraints import Constraint
-from keras.layers import Dense, Wrapper, Lambda
-
+from keras.layers import Dense, Lambda
+from keras.layers.wrappers import Wrapper
 
 class Interpolate1D(Layer):
     def __init__(self, **kwargs):

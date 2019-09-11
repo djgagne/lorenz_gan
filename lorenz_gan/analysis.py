@@ -45,9 +45,9 @@ def offline_gan_predictions(gan_index, data,
     if gan_index < 300:
         rand_size = 1
     elif gan_index >= 700 and gan_index < 800:
-        rand_size = 19
+        rand_size = 35
     elif gan_index >= 800:
-        rand_size = 18
+        rand_size = 34
     else:
         rand_size = 17
     random_values = rs.normal(size=(data.shape[0], rand_size))

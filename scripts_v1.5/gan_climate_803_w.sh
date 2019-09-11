@@ -1,15 +1,14 @@
 #!/bin/bash
-#PBS -N off_gan
+#PBS -N c_gan_803
 #PBS -A NAML0001
 #PBS -q regular
-#PBS -l walltime=8:00:00
+#PBS -l walltime=04:00:00
 #PBS -l select=1:ncpus=36:ompthreads=36
 #PBS -m abe
 #PBS -M dgagne@ucar.edu
 #PBS -j oe
 module unload ncarenv
-echo `hostname`
-source /glade/u/home/dgagne/.bashrc
+source /glade/u/home/dgagne/.bash_profile
 export PATH="/glade/u/home/dgagne/miniconda3/envs/ml/bin:$PATH"
 cd /glade/u/home/dgagne/lorenz_gan
-python -u gan_offline_analysis.py config/exp_20_stoch/gan_offline_config.yaml -n 8 &> offline_gan.log
+python -u run_lorenz_forecast.py config/exp_20_stoch/climate_gan_n_803_c_dense_w.yaml -p 1 &> gan_803_climate.log
