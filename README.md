@@ -10,7 +10,7 @@ Reqiured Python Libraries:
 * pandas
 * jupyter
 * keras
-* tensorflow
+* tensorflow<=1.15
 * scikit-learn
 * netcdf4
 * pyyaml
@@ -29,13 +29,7 @@ Once the dependencies are installed, install the lorenz_gan package in your Pyth
 the following commands
 ```bash
 >>> cd ~/lorenz_gan
->>> python setup.py install
-```
-
-If you are actively developing the code and do not want to keep re-installing the library after change,
-you can use the following command to install a soft-link between the Python environment and the code:
-```
->>> python setup.py develop
+>>> pip install .
 ```
 
 ## Running the Lorenz '96 Model
@@ -49,7 +43,7 @@ The program ```train_lorenz_gan.py``` runs the Lorenz truth model and fits all o
 the GAN. To run the program
 ```
 >>> cd ~/lorenz_gan/
->>> python train_lorenz_gan.py config/lorenz.yaml -g
+>>> python train_lorenz_gan.py config/lorenz_gan_travis.yaml -g
 ```
 
 This option will run the Lorenz truth model and train a random number updater, histogram parameterization, 
@@ -62,7 +56,7 @@ runs the GAN training. If you do not wish to train the GAN, which can take a few
 The program ```run_lorenz_forecast.py``` runs an ensemble of Lorenz forecast models with the parameterization specified
 in the config file. 
 ```
->>> python run_lorenz_forecast.py config/forecast_poly.yaml -p 3
+>>> python run_lorenz_forecast.py config/forecast_gan_travis.yaml -p 2
 ```
 The ```-p``` argument specifies the number of processors to be used for generating forecasts. Each forecast member in
 the ensemble is run in a separate process.

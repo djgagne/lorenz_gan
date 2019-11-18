@@ -115,8 +115,6 @@ def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_
             launch_forecast_member(member, x_initial, u_initial, f, u_model_path, u_model, random_updater, num_steps,
                                    num_random, time_step, random_seeds[member], initial_step_value, x_only,
                                    predict_residuals, out_path)
-        if sess is not None:
-            sess.close()
     except Exception as e:
         print(traceback.format_exc())
         raise e
