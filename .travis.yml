@@ -1,6 +1,5 @@
 language: python
 env:
-  - PYTHON_VERSION=2.7 IPYTHON_KERNEL=python2
   - PYTHON_VERSION=3.6 IPYTHON_KERNEL=python3
 before_install:
   - wget -q https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh
@@ -13,7 +12,7 @@ install:
   - source activate testenv
   - conda install --yes -q -c conda-forge scikit-learn scikit-image netcdf4 xarray numba
   - pip install pyyaml
-  - pip install tensorflow
+  - pip install tensorflow==1.15.0
   - pip install keras
   - pip install .
   - mkdir exp_travis

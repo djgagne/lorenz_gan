@@ -1,0 +1,12 @@
+numpy
+scipy
+matplotlib
+xarray
+netcdf4
+tensorflow<=1.15.0
+keras
+numba
+pandas
+jupyter
+scikit-learn
+pyyaml
