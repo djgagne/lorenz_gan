@@ -104,7 +104,7 @@ def main():
         save_lorenz_output(X_out, Y_out, times, steps, config["lorenz"], config["output_nc_file"])
         combined_data.to_csv(config["output_csv_file"], index=False)
         combined_test_data.to_csv(str(config["output_csv_file"]).replace(".csv", "_test.csv"))
-    train_random_updater(X_out[:, 5], config["random_updater"]["out_file"])
+    train_random_updater(X_out[:, 1], config["random_updater"]["out_file"])
     u_vals = combined_data["u_scale"] * combined_data["Ux_t+1"]
     train_histogram(combined_data["X_t"].values,
                     u_vals, **config["histogram"])
@@ -127,6 +127,9 @@ def main():
                        u_time_series,
                        **config["poly_add"])
     if "ann_res" in config.keys():
+        print("X in", x_time_series.min(), x_time_series.max())
+        print("U out", u_time_series.min(), u_time_series.max())
+
         train_ann_res(x_time_series,
                       u_time_series,
                       config["ann_res"])
