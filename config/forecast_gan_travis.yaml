@@ -5,7 +5,7 @@ u_model_name: gan
 u_model_path: ./exp_travis/gan_generator_0000_epoch_0030.h5
 random_updater_path: ./exp_travis/ar1_random_updater.pkl
 num_steps: 10000
-num_random: 1
+num_random: 34
 time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 6000]
