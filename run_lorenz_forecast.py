@@ -68,7 +68,9 @@ def main():
                 os.mkdir(step_dir)
             x_initial = lorenz_output["lorenz_x"][step_index].values
             y_initial = lorenz_output["lorenz_y"][step_index].values
-            u_initial = y_initial.reshape(8, 32).sum(axis=1)
+            print(x_initial.shape)
+            print(y_initial.shape)
+            u_initial = y_initial.reshape(x_initial.shape[0], y_initial.size // x_initial.size).sum(axis=1)
             launch_forecast_step(members, np.copy(x_initial), u_initial, f, u_model_path, random_updater_path,
                                  num_steps, num_random, time_step, random_seeds, step, x_only,
                                  predict_residuals, out_path, num_tf_threads)
@@ -78,7 +80,7 @@ def main():
             step_index = np.where(step_values == step)[0][0]
             x_initial = lorenz_output["lorenz_x"][step_index].values
             y_initial = lorenz_output["lorenz_y"][step_index].values
-            u_initial = y_initial.reshape(8, 32).sum(axis=1)
+            u_initial = y_initial.reshape(x_initial.shape[0], y_initial.size // x_initial.size).sum(axis=1)
             pool.apply_async(launch_forecast_step, (members, x_initial, u_initial, f, u_model_path,
                                                     random_updater_path, num_steps, num_random, time_step,
                                                     random_seeds, step, x_only, predict_residuals,
@@ -103,6 +105,11 @@ def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_
             K.set_session(sess)
             u_model = SubModelGAN(u_model_path)
         elif "annres" in u_model_path.split("/")[-1]:
+            sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+                                                        inter_op_parallelism_threads=1))
+            K.set_session(sess)
+            u_model = load_ann_model(u_model_path)
+        elif "ann" in u_model_path.split("/")[-1]:
             sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
                                                         inter_op_parallelism_threads=1))
             K.set_session(sess)

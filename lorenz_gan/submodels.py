@@ -175,7 +175,7 @@ class SubModelANN(object):
     def __init__(self, inputs=1, hidden_layers=2, hidden_neurons=8,
                  activation="selu", l2_weight=0.01, learning_rate=0.001, loss="mse",
                  noise_sd=1, beta_1=0.9, model_path=None, dropout_alpha=0.5,
-                 num_epochs=10, batch_size=1024, verbose=0, model_config=0):
+                 num_epochs=10, batch_size=1024, verbose=0, model_config=0, **kwargs):
         self.config = dict(inputs=inputs,
                            hidden_layers=hidden_layers,
                            hidden_neurons=hidden_neurons,
@@ -190,9 +190,9 @@ class SubModelANN(object):
                            num_epochs=num_epochs,
                            batch_size=batch_size,
                            verbose=verbose,
-                           model_config=model_config)
-        model_path_start = join(model_path.split("/")[:-1])
-        self.x_scaling_file = join(model_path_start, "ann_config_{0}_scale.csv".format(self.config["model_config"]))
+                           model_config=model_config,
+                           corr=1,
+                           res_sd=0)
         if model_path is None:
             nn_input = Input((inputs, ))
             nn_model = nn_input
@@ -202,15 +202,23 @@ class SubModelANN(object):
                     nn_model = LeakyReLU(0.1)(nn_model)
                 else:
                     nn_model = Activation(activation)(nn_model)
-                nn_model = Dropout(dropout_alpha)(nn_model)
-                nn_model = GaussianNoise(noise_sd)(nn_model)
+                if dropout_alpha > 0:
+                    nn_model = Dropout(dropout_alpha)(nn_model)
+                if noise_sd > 0:
+                    nn_model = GaussianNoise(noise_sd)(nn_model)
             nn_model = Dense(1)(nn_model)
             self.model = Model(nn_input, nn_model)
             self.model.compile(Adam(lr=learning_rate, beta_1=beta_1), loss=loss)
             self.x_scaling_file = None
             self.x_scaling_values = None
+            self.sample_predict = K.function([self.model.input, K.learning_phase()], [self.model.output])
         elif type(model_path) == str:
+            model_path_start = join(*model_path.split("/")[:-1])
             self.model = load_model(model_path)
+            self.sample_predict = K.function([self.model.input, K.learning_phase()], [self.model.output])
+
+            self.x_scaling_file = join(model_path_start,
+                                       "ann_config_{0:04d}_scale.csv".format(self.config["model_config"]))
             self.x_scaling_values = pd.read_csv(self.x_scaling_file, index_col="Channel")
 
     def fit(self, cond_x, u):
@@ -218,25 +226,39 @@ class SubModelANN(object):
                                                        scaling_values=self.x_scaling_values)
         self.model.fit(norm_x, u, batch_size=self.config["batch_size"], epochs=self.config["num_epochs"],
                        verbose=self.config["verbose"])
-        self.x_scaling_values.to_csv(self.x_scaling_file, index_label="Channel")
+        u_mean = self.model.predict(norm_x).ravel()
+        residuals = u.ravel() - u_mean
+        self.config["corr"] = float(np.corrcoef(residuals[1:], residuals[:-1])[0, 1])
+        self.config["res_sd"] = float(np.std(residuals))
 
-    def predict(self, cond_x, residuals=None, predict_residuals=True):
+    def predict(self, cond_x, residuals=None, predict_residuals=False):
         norm_x = normalize_data(cond_x, scaling_values=self.x_scaling_values)[0]
-        sample_predict = K.function([self.model.input, K.learning_phase()], [self.model.output])
-        u_mean = sample_predict([norm_x, 0])[0].ravel()
-        u_total = sample_predict([norm_x, 1])[0].ravel()
-        u_res = u_total - u_mean
+        u_mean = self.sample_predict([norm_x, 0])[0].ravel()
         if predict_residuals:
+            u_total = self.sample_predict([norm_x, 1])[0].ravel()
+            u_res = u_total - u_mean
             return u_mean, u_res
         else:
             return u_mean
 
+    def predict_mean(self, cond_x):
+        norm_x = normalize_data(cond_x, scaling_values=self.x_scaling_values)[0]
+        u_mean = self.sample_predict([norm_x, 0])[0].ravel()
+        return u_mean
+
+    def predict_res(self, residuals):
+        u_res = self.config["corr"] * residuals + \
+                self.config["res_sd"] * np.sqrt(1 - self.config["corr"] ** 2) * np.random.normal(size=residuals.shape)
+        u_res = u_res.ravel()
+        return u_res
+
     def save_model(self, out_path):
-        out_config_file = join(out_path, "ann_res_config_{0:04d}_opts.yaml".format(self.config["model_config"]))
+        out_config_file = join(out_path, "ann_config_{0:04d}_opts.yaml".format(self.config["model_config"]))
         with open(out_config_file, "w") as out_config:
             yaml.dump(self.config, out_config)
-        model_file = join(out_path, "ann_res_config_{0:04d}_model.nc".format(self.config["model_config"]))
+        model_file = join(out_path, "ann_config_{0:04d}_model.nc".format(self.config["model_config"]))
         save_model(self.model, model_file)
+        self.x_scaling_file = join(out_path,  "ann_config_{0:04d}_scale.csv".format(self.config["model_config"]))
         self.x_scaling_values.to_csv(self.x_scaling_file, index_label="Channel")
 
 

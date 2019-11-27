@@ -1,0 +1,17 @@
+num_members: 3
+initial_x: []
+F: 15
+u_model_name: ann
+u_model_path: ./exp_pierre/ann_config_0005_opts.yaml
+random_updater_path: ./exp_pierre/ar1_random_updater.pkl
+num_steps: 10000
+num_random: 1
+time_step: 0.005
+x_time_lag: 0
+random_seeds: [5000, 6000]
+initial_step: 50000
+x_only: 1
+call_param_once: 1
+predict_residuals: 1
+lorenz_nc_file: ./exp_pierre/lorenz_output.nc
+out_path: ./exp_pierre/exp_ann/

@@ -157,17 +157,6 @@ def run_lorenz96_forecast(x_initial, u_initial, f, u_model, random_updater, num_
     x_u_curr[0] = x_initial[:]
     x_u_curr[1] = u_initial[:]
     coords = {"step": steps, "x_size": np.arange(x_initial.size)}
-    #X_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-    #                     coords=coords, dims=("step", "x_size"),
-    #                     attrs={"long_name": "x values"})
-    #U_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-    #                     coords=coords, dims=("step", "x_size"),
-    #                     attrs={"long_name": "u total values"})
-    #U_res_out = xr.DataArray(np.zeros((num_steps, x_initial.size)),
-    #                         coords=coords, dims=("step", "x_size"),
-    #                         attrs={"long_name": "u residual values"})
-    #X_out[0] = x_initial[:]
-    #U_out[0] = u_initial[:]
     X_out = np.zeros((num_steps, x_initial.size))
     U_out = np.zeros((num_steps, x_initial.size))
     U_res_out = np.zeros((num_steps, x_initial.size))

@@ -2,7 +2,7 @@ from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lore
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete, generator_dense_auto_stoch
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, unnormalize_data
-from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes
+from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes, SubModelANN
 import tensorflow as tf
 import xarray as xr
 import keras.backend as K
@@ -126,6 +126,12 @@ def main():
         train_poly_add(x_time_series,
                        u_time_series,
                        **config["poly_add"])
+    if "ann" in config.keys():
+        print("X in", x_time_series.min(), x_time_series.max())
+        print("U out", u_time_series.min(), u_time_series.max())
+        train_ann(x_time_series,
+                      u_time_series,
+                      config["ann"])
     if "ann_res" in config.keys():
         print("X in", x_time_series.min(), x_time_series.max())
         print("U out", u_time_series.min(), u_time_series.max())
@@ -272,10 +278,16 @@ def train_poly_add(x_data, u_data, num_terms=3, out_file="./poly_add.pkl"):
         pickle.dump(poly_add_model, out_file_obj, pickle.HIGHEST_PROTOCOL)
 
 
+def train_ann(x_data, u_data, config):
+    print("ANN Input shapes", x_data.shape, u_data.shape)
+    ann_model = SubModelANN(**config)
+    ann_model.fit(x_data, u_data)
+    ann_model.save_model(config["out_path"])
+
 def train_ann_res(x_data, u_data, config):
     ann_res_model = SubModelANNRes(**config)
     ann_res_model.fit(x_data, u_data)
-    ann_res_model.save_model(config["model_path"])
+    ann_res_model.save_model(config["out_path"])
 
 
 if __name__ == "__main__":
