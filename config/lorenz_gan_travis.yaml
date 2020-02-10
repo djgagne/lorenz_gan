@@ -66,13 +66,13 @@ ann:
   hidden_layers: 2
   hidden_neurons: 16
   activation: selu
-  l2_weight: 1e-4
+  l2_weight: 1e-5
   learning_rate: 0.001
   loss: mae
   noise_sd: 0
   beta_1: 0.90
   out_path: "./exp_travis"
-  dropout_alpha: 0.1
+  dropout_alpha: 0.0
   num_epochs: 20
   batch_size: 128
   verbose: 1

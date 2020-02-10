@@ -9,7 +9,7 @@ num_random: 1
 time_step: 0.005
 x_time_lag: 0
 random_seeds: [5000, 6000]
-initial_step: 50000
+initial_step: 601010
 x_only: 1
 call_param_once: 1
 predict_residuals: 1

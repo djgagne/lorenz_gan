@@ -9,10 +9,10 @@ lorenz:
     num_steps: 1001000
     skip: 5
     burn_in: 1000
-    train_test_split: 0.4
+    train_test_split: 0.6
 gan:
     structure: specified_random
-    t_skip: 5
+    t_skip: 1
     x_skip: 1
     output: sample
     cond_inputs: ["X_t"]
@@ -63,18 +63,18 @@ poly_add:
     out_file: ./exp_pierre/u_poly_add.pkl
 ann:
   inputs: 1
-  hidden_layers: 1
-  hidden_neurons: 32
+  hidden_layers: 2
+  hidden_neurons: 16
   activation: selu
-  l2_weight: 1e-4
+  l2_weight: 0.0001
   learning_rate: 0.001
-  loss: mae
+  loss: mse
   noise_sd: 0
-  beta_1: 0.90
+  beta_1: 0.99
   out_path: "./exp_pierre"
   dropout_alpha: 0.1
   num_epochs: 30
-  batch_size: 128
+  batch_size: 1024
   verbose: 1
   model_config: 5
 output_nc_file: ./exp_pierre/lorenz_output.nc

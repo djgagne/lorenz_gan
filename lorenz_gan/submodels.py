@@ -250,7 +250,7 @@ class SubModelANN(object):
         u_res = self.config["corr"] * residuals + \
                 self.config["res_sd"] * np.sqrt(1 - self.config["corr"] ** 2) * np.random.normal(size=residuals.shape)
         u_res = u_res.ravel()
-        return u_res
+        return np.zeros(u_res.shape)
 
     def save_model(self, out_path):
         out_config_file = join(out_path, "ann_config_{0:04d}_opts.yaml".format(self.config["model_config"]))

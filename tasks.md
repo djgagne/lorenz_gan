@@ -26,3 +26,7 @@ unresolved state?
     * Spatial autocorrelation averaged over all X locations
     * PDFs of X values and comparison with truth PDF
     * Hellinger distance on climatological PDF of forecast vs truth
+    
+* Proposal
+     * Time series of X vs time with perturbed initial conditions.
+     * Subgrid effect when you have a deterministic neural network parameterization.

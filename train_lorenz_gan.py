@@ -127,10 +127,8 @@ def main():
                        u_time_series,
                        **config["poly_add"])
     if "ann" in config.keys():
-        print("X in", x_time_series.min(), x_time_series.max())
-        print("U out", u_time_series.min(), u_time_series.max())
-        train_ann(x_time_series,
-                      u_time_series,
+        train_ann(combined_data["X_t"].values.reshape(-1, 1),
+                  combined_data["Ux_t+1"].values.reshape(-1, 1),
                       config["ann"])
     if "ann_res" in config.keys():
         print("X in", x_time_series.min(), x_time_series.max())
