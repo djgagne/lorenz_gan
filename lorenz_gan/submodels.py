@@ -1,8 +1,8 @@
-from keras.models import Model, load_model, save_model
-import keras.backend as K
-from keras.layers import Dense, Activation, Input, LeakyReLU, Dropout, GaussianNoise, concatenate
-from keras.optimizers import Adam
-from keras.regularizers import l2
+from tensorflow.keras.models import Model, load_model, save_model
+import tensorflow.compat.v1.keras.backend as K
+from tensorflow.keras.layers import Dense, Activation, Input, LeakyReLU, Dropout, GaussianNoise, concatenate
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.regularizers import l2
 import numpy as np
 from os.path import join, exists
 import pandas as pd

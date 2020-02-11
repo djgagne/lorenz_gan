@@ -86,6 +86,44 @@ linecolors = [       0.0      0.0        0.0; %  1. TRU: black
                  0.7922    0.9458    0.3196;
                  0.05       0.05       0.05];    % 29. poly: grey
 
+%% choose carefully. Group similar schemes
+linecolors = [       0.0      0.0        0.0; %  1. TRU: black
+                 %----- vvv dont use ----- vvvvvv
+                 0.6422    0.2392    0.7228;  %  2. det: purple < dont use
+                 %----- ^^^ dont use ----- ^^^^^^
+                 0.3       0.3       0.3;  %  3. S100 series:violet
+                 0.3       0.3       0.3 ; 
+                 0.3       0.3       0.3 ;
+                 0.3       0.3       0.3 ;
+                  0.75       0.75       0.75;  %  7. S200 series:magenta
+                  0.75       0.75       0.75;
+                 %----- vvv dont use ----- vvvvvv
+                 0.4250    0.1625    0.0490;  %  9. S500 series:reds
+                 0.6375    0.2438    0.0735; 
+                 0.8500    0.3250    0.0980; 
+                 1         0.3930    0.1186;
+                 0.7432    0.5552    0.100;   % 13. S600 series:yellows
+                 1         0.83280   0.150; 
+                 %----- ^^^ dont use ------ ^^^^^^
+                 0.8500    0.2250    0.0980;  % 15. S700 series:reds
+                 0.8500    0.2250    0.0980; 
+                 0.8500    0.2250    0.0980; 
+                 0.8500    0.2250    0.0980; 
+                 1.0000    0.5469         0;  % 19. S800 series:yellows
+                 1.0000    0.5469         0;
+                 1.0000    0.5469         0; 
+                       0   0.5364    0.8892;  % 22. S700_white series:blues
+                       0   0.5364    0.8892; 
+                       0   0.5364    0.8892;
+                       0   0.5364    0.8892;
+                 0.4    0.7558    1.;  % 26. S800_white series:greens
+                 0.4    0.7558    1.;
+                 0.4    0.7558    1.;
+                 0.5       0.5       0.5];    % 29. poly: grey
+
+
+
+
 
 id_list_legend_new = id_list_legend;
 id_list_legend_new{3} = 'XU-lrg-w*';

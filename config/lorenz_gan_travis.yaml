@@ -61,21 +61,5 @@ poly:
 poly_add:
     num_terms: 3
     out_file: ./exp_travis/u_poly_add.pkl
-ann:
-  inputs: 1
-  hidden_layers: 2
-  hidden_neurons: 16
-  activation: selu
-  l2_weight: 1e-5
-  learning_rate: 0.001
-  loss: mae
-  noise_sd: 0
-  beta_1: 0.90
-  out_path: "./exp_travis"
-  dropout_alpha: 0.0
-  num_epochs: 20
-  batch_size: 128
-  verbose: 1
-  model_config: 5
 output_nc_file: ./exp_travis/lorenz_output.nc
 output_csv_file: ./exp_travis/lorenz_combined_output.csv

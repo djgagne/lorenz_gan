@@ -1,9 +1,10 @@
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 import numpy as np
 import xarray as xr
 import yaml
 import argparse
-import keras.backend as K
-import tensorflow as tf
+import tensorflow.compat.v1.keras.backend as K
 from lorenz_gan.lorenz import run_lorenz96_forecast
 from lorenz_gan.submodels import SubModelGAN, load_ann_model
 from multiprocessing import Pool
@@ -100,17 +101,17 @@ def launch_forecast_step(members, x_initial, u_initial, f, u_model_path, random_
         with open(random_updater_path, "rb") as random_updater_file:
             random_updater = pickle.load(random_updater_file)
         if u_model_path[-2:] == "h5":
-            sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+            sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
                                                         inter_op_parallelism_threads=1))
             K.set_session(sess)
             u_model = SubModelGAN(u_model_path)
         elif "annres" in u_model_path.split("/")[-1]:
-            sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+            sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
                                                         inter_op_parallelism_threads=1))
             K.set_session(sess)
             u_model = load_ann_model(u_model_path)
         elif "ann" in u_model_path.split("/")[-1]:
-            sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
+            sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(intra_op_parallelism_threads=num_tf_threads,
                                                         inter_op_parallelism_threads=1))
             K.set_session(sess)
             u_model = load_ann_model(u_model_path)

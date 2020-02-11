@@ -1,12 +1,13 @@
+import tensorflow as tf
+tf.compat.v1.disable_eager_execution()
 from lorenz_gan.lorenz import run_lorenz96_truth, process_lorenz_data, save_lorenz_output
 from lorenz_gan.gan import generator_conv, generator_dense, discriminator_conv, discriminator_dense
 from lorenz_gan.gan import predict_stochastic, generator_dense_stoch, discriminator_conv_concrete, generator_dense_auto_stoch
 from lorenz_gan.gan import train_gan, initialize_gan, normalize_data, generator_conv_concrete, unnormalize_data
 from lorenz_gan.submodels import AR1RandomUpdater, SubModelHist, SubModelPoly, SubModelPolyAdd, SubModelANNRes, SubModelANN
-import tensorflow as tf
 import xarray as xr
-import keras.backend as K
-from keras.optimizers import Adam
+import tensorflow.compat.v1.keras.backend as K
+from tensorflow.keras.optimizers import Adam
 import numpy as np
 import pickle
 import pandas as pd
@@ -179,7 +180,7 @@ def train_lorenz_gan(config, combined_data, combined_time_series):
         num_procs = config["num_procs"]
     else:
         num_procs = 1
-    sess = tf.Session(config=tf.ConfigProto(intra_op_parallelism_threads=num_procs,
+    sess = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(intra_op_parallelism_threads=num_procs,
                                                 inter_op_parallelism_threads=1))
     K.set_session(sess)
     x_cols = config["gan"]["cond_inputs"]

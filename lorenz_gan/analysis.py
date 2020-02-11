@@ -6,7 +6,7 @@ from sklearn.mixture import GaussianMixture
 from glob import glob
 from os.path import join
 import tensorflow as tf
-import keras.backend as K
+import tensorflow.compat.v1.keras.backend as K
 import gc
 
 def load_test_data(filename,
@@ -78,10 +78,10 @@ def offline_gan_predictions(gan_index, data,
     return gen_preds_out, gen_noise
 
 def single_gan_predictions(gen_file, data, all_zeros, random_values, seed, batch_size):
-    sess_config = tf.ConfigProto(intra_op_parallelism_threads=1,
+    sess_config = tf.compat.v1.ConfigProto(intra_op_parallelism_threads=1,
                                    inter_op_parallelism_threads=1,
                                    gpu_options=tf.GPUOptions(allow_growth=True))
-    sess = tf.Session(config=sess_config)
+    sess = tf.compat.v1.Session(config=sess_config)
     K.set_session(sess)
     tf.set_random_seed(seed)
     print("Predicting " + gen_file)

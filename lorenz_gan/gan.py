@@ -1,21 +1,21 @@
-from keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, Add
-from keras.layers import Conv1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
-from keras.layers import GaussianNoise
-from keras.initializers import RandomUniform
-import keras.backend as K
+from tensorflow.keras.layers import concatenate, RepeatVector, Input, Flatten, BatchNormalization, Dropout, Add
+from tensorflow.keras.layers import Conv1D, Activation, Reshape, LeakyReLU, Layer, MaxPool1D, AveragePooling1D
+from tensorflow.keras.layers import GaussianNoise
+from tensorflow.keras.initializers import RandomUniform
+import tensorflow.compat.v1.keras.backend as K
 import tensorflow as tf
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 from scipy.stats import expon
-from keras.models import Model
+from tensorflow.keras.models import Model
 import numpy as np
 import pandas as pd
 from os.path import join
-from keras.regularizers import l2
-from keras.engine import InputSpec
-from keras.initializers import Initializer
-from keras.constraints import Constraint
-from keras.layers import Dense, Lambda
-from keras.layers.wrappers import Wrapper
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.layers import InputSpec
+from tensorflow.keras.initializers import Initializer
+from tensorflow.keras.constraints import Constraint
+from tensorflow.keras.layers import Dense, Lambda
+from tensorflow.keras.layers import Wrapper
 
 class Interpolate1D(Layer):
     def __init__(self, **kwargs):
