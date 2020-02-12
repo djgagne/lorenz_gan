@@ -10,7 +10,7 @@ Reqiured Python Libraries:
 * pandas
 * jupyter
 * keras
-* tensorflow<=1.15.0
+* tensorflow>=1.15.1
 * scikit-learn
 * netcdf4
 * pyyaml
