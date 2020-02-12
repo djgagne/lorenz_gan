@@ -14,7 +14,7 @@ if __name__ == "__main__":
                             "matplotlib",
                             "xarray",
                             "netcdf4",
-                            "tensorflow>=1.15.1",
+                            "tensorflow>=2.0",
                             "keras",
                             "numba",
                             "pandas",
